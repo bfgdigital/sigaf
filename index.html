@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bitcoin "Should I Give a Fuck" Meter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.4;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 30px 30px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .main-title {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin: 0;
+            color: #1a1a1a;
+        }
+
+        .weekly-movement {
+            font-size: 1em;
+            margin: 12px 0 0 0;
+            opacity: 0.7;
+        }
+
+        .velocity-up {
+            color: #059669;
+        }
+
+        .velocity-down {
+            color: #dc2626;
+        }
+
+        .block-info {
+            font-size: 0.85em;
+            color: #6b7280;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 32px;
+        }
+
+        .section-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.9em;
+        }
+
+        .macro-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .macro-table td {
+            padding: 16px 12px;
+            text-align: center;
+            border-right: 1px solid #e9ecef;
+        }
+
+        .macro-table td:last-child {
+            border-right: none;
+        }
+
+        .macro-table .label {
+            font-size: 0.8em;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .macro-table .value {
+            font-size: 1em;
+            font-weight: 600;
+            color: #1a1a1a;
+            position: relative;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            color: #1a1a1a;
+            padding: 16px 20px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            width: 300px;
+            line-height: 1.5;
+            z-index: 9999;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            border: 1px solid #e9ecef;
+            pointer-events: none;
+        }
+
+        .tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            right: 20px;
+            width: 12px;
+            height: 12px;
+            background: #ffffff;
+            border-left: 1px solid #e9ecef;
+            border-top: 1px solid #e9ecef;
+            transform: rotate(45deg);
+        }
+
+        .value:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            background: #e5e7eb;
+            color: #6b7280;
+            border-radius: 50%;
+            font-size: 11px;
+            margin-left: 4px;
+            cursor: help;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+
+        .tooltip-icon-subtle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            background: #f3f4f6;
+            color: #9ca3af;
+            border-radius: 50%;
+            font-size: 10px;
+            margin-left: 3px;
+            cursor: help;
+            font-weight: 600;
+            vertical-align: middle;
+            opacity: 0.6;
+        }
+
+        .value {
+            display: inline-flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .micro-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        .micro-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px 12px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .micro-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .micro-card .horizon {
+            font-size: 0.75em;
+            color: #6b7280;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .micro-card .signal {
+            font-size: 1.4em;
+            font-weight: 700;
+            margin: 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .micro-card .detail {
+            font-size: 0.8em;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+
+        .sig-meh {
+            color: #6b7280;
+        }
+
+        .sig-watch {
+            color: #2563eb;
+        }
+
+        .sig-no-bueno {
+            color: #dc2626;
+        }
+
+        .sig-party {
+            color: #059669;
+        }
+
+        .sig-peachy {
+            color: #d97706;
+        }
+
+        .final-word {
+            background: linear-gradient(135deg, #1a1a1a 0%, #374151 100%);
+            color: white;
+            text-align: center;
+            padding: 50px 30px;
+            margin: 0;
+        }
+
+        .final-question {
+            font-size: 1.3em;
+            font-weight: 400;
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+
+        .final-answer {
+            font-size: 4em;
+            font-weight: 800;
+            margin: 0;
+            text-transform: lowercase;
+            letter-spacing: -2px;
+        }
+
+        .verdict-yeah {
+            color: #10b981;
+        }
+
+        .verdict-nah {
+            color: #ef4444;
+        }
+
+        .verdict-yeah-nah {
+            color: #f59e0b;
+        }
+
+        .footer {
+            padding: 30px;
+            text-align: center;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .footer-text {
+            font-size: 0.9em;
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+
+        .footer-link {
+            font-size: 0.85em;
+            color: #2563eb;
+            text-decoration: none;
+        }
+
+        .footer-link:hover {
+            text-decoration: underline;
+        }
+
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            text-align: center;
+        }
+
+        .calculating-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            color: #374151;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 30px 20px 20px;
+            }
+
+            .content,
+            .footer {
+                padding: 20px;
+            }
+
+            .main-title {
+                font-size: 1.8em;
+            }
+
+            .final-answer {
+                font-size: 3em;
+            }
+
+            .micro-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="weekly-movement" id="weeklyMovement"></div>
+            <h1 class="main-title" id="mainTitle">Should I Give A Fuck?</h1>
+            <div class="block-info" id="blockInfo" style="display:none;"></div>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <div class="section-title">Geometric Benchmark</div>
+                <table class="macro-table">
+                    <tr>
+                        <td>
+                            <span class="label">Current Trend Angle</span>
+                            <span class="value" id="currentAngle">—<span class="tooltip-icon">?</span>
+                                <div class="tooltip">
+                                    This is our dynamic benchmark. It's the angle of the line from Bitcoin's origin to
+                                    its current price. Recent momentum is compared against this angle.
+                                </div>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="label">ATH Benchmark</span>
+                            <span class="value" id="benchmarkAngle">45°<span class="tooltip-icon">?</span>
+                                <div class="tooltip">
+                                    The theoretical ideal. This represents a perfect, straight line from origin to the
+                                    All-Time High price. It serves as a fixed reference point.
+                                </div>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="label">Current Price</span>
+                            <span class="value" id="macroPrice">—<span class="tooltip-icon-subtle">?</span>
+                                <div class="tooltip">
+                                    Bitcoin's price at the most recent data point.
+                                </div>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="label">All Time High</span>
+                            <span class="value" id="athPrice">—<span class="tooltip-icon-subtle">?</span>
+                                <div class="tooltip">
+                                    Bitcoin's highest recorded price. This defines the top of our geometric chart.
+                                </div>
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Recent Momentum (Statistically Derived Lookbacks)</div>
+                <div class="micro-grid" id="microGrid">
+                    <div class="calculating-overlay">Calibrating & Analyzing...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="final-word">
+            <div class="final-question">So should you give a fuck?</div>
+            <div class="final-answer" id="finalWord">...</div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-text">
+                Each horizon shows the velocity and direction of recent price movement.<br>
+                If every horizon is <strong>red</strong> then you should give a fuck.
+            </div>
+            <a href="wtfit.html" class="footer-link">Read the full explanation →</a>
+            <div class="error" id="errorStatus" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const CSV_URL = "data/btc-price-history-data.csv";
+        const ACF_MAX_LAG = 400;
+        const GENESIS_DATE = new Date('2009-01-03T00:00:00Z');
+
+        function parseCsvLines(lines, calibratedBlockTimeMs) {
+            if (calibratedBlockTimeMs <= 0) return [];
+            const genesisTime = GENESIS_DATE.getTime();
+            return lines.map(line => {
+                const cells = line.split(",");
+                let date, price;
+                if (!isNaN(cells[0]) && cells[0].length > 8) {
+                    date = new Date(Number(cells[0]));
+                    price = parseFloat(cells[1]);
+                } else {
+                    date = new Date(cells[0]);
+                    price = parseFloat(cells[1]);
+                }
+                if (isNaN(date.getTime()) || isNaN(price)) return null;
+                const block = Math.floor((date.getTime() - genesisTime) / calibratedBlockTimeMs);
+                return { block, price };
+            }).filter(d => d && d.block >= 0);
+        }
+
+        function resampleToBlockIntervals(historicalData, interval) {
+            if (!historicalData.length || interval <= 0) return [];
+            const resampled = [];
+            let currentDataIndex = 0;
+            const startBlock = historicalData[0].block;
+            const endBlock = historicalData[historicalData.length - 1].block;
+
+            for (let targetBlock = startBlock; targetBlock <= endBlock; targetBlock += interval) {
+                while (currentDataIndex < historicalData.length - 1 && historicalData[currentDataIndex + 1].block < targetBlock) {
+                    currentDataIndex++;
+                }
+                resampled.push(historicalData[currentDataIndex].price);
+            }
+            return resampled;
+        }
+
+        function calculateLogReturns(priceSeries) {
+            const returns = [];
+            for (let i = 1; i < priceSeries.length; i++) {
+                if (priceSeries[i] > 0 && priceSeries[i - 1] > 0) {
+                    returns.push(Math.log(priceSeries[i]) - Math.log(priceSeries[i - 1]));
+                }
+            }
+            return returns;
+        }
+
+        function calculateACF(series, maxLag) {
+            const n = series.length;
+            if (n === 0) return [];
+            const mean = series.reduce((a, b) => a + b) / n;
+            const variance = series.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+            if (variance === 0) return [];
+
+            const acf = [];
+            for (let lag = 1; lag <= maxLag; lag++) {
+                let autocovariance = 0;
+                for (let i = lag; i < n; i++) {
+                    autocovariance += (series[i] - mean) * (series[i - lag] - mean);
+                }
+                acf.push(autocovariance / (n * variance));
+            }
+            return acf;
+        }
+
+        function calculatePACF(series, maxLag) {
+            const acf = calculateACF(series, maxLag);
+            if (acf.length === 0) return [];
+
+            const finalPacf = [];
+            if (maxLag > 0) {
+                finalPacf.push(acf[0]);
+            }
+
+            for (let k = 2; k <= maxLag; k++) {
+                let phi_k_k;
+                const phi_k_minus_1 = finalPacf.slice(0, k - 1);
+
+                let numerator = acf[k - 1];
+                let denominator = 1;
+
+                for (let j = 1; j < k; j++) {
+                    numerator -= phi_k_minus_1[j - 1] * acf[k - 1 - j];
+                    denominator -= phi_k_minus_1[j - 1] * acf[j - 1];
+                }
+
+                phi_k_k = (Math.abs(denominator) < 1e-9) ? 0 : numerator / denominator;
+                finalPacf.push(phi_k_k);
+            }
+            return finalPacf;
+        }
+
+        function findSignificantLags(acf, n, numLagsToFind = 5, maxLag, blockInterval) {
+            const confidenceInterval = 1.96 / Math.sqrt(n);
+            const bins = Array.from({ length: numLagsToFind }, () => ({ lag: 0, acf: 0 }));
+            const binSize = Math.floor(maxLag / numLagsToFind);
+            if (binSize === 0) return [];
+
+            for (let i = 0; i < acf.length; i++) {
+                const lag = i + 1;
+                const acfValue = Math.abs(acf[i]);
+
+                if (acfValue > confidenceInterval) {
+                    const binIndex = Math.min(Math.floor((lag - 1) / binSize), numLagsToFind - 1);
+                    if (acfValue > bins[binIndex].acf) {
+                        bins[binIndex] = { lag, acf: acfValue };
+                    }
+                }
+            }
+
+            let finalLags = bins.map(bin => bin.lag).filter(lag => lag > 0);
+
+            if (finalLags.length < numLagsToFind) {
+                const defaultLagsInDays = [14, 30, 90, 180, 365];
+                const defaultLagsInIntervals = defaultLagsInDays.map(d => Math.round(d * 144 / blockInterval));
+                finalLags = [...new Set([...finalLags, ...defaultLagsInIntervals])].sort((a, b) => a - b).slice(0, numLagsToFind);
+            }
+            return finalLags;
+        }
+
+        function calculateNormalizedSegmentAngle(startBlock, startPrice, endBlock, endPrice, maxBlock, maxPrice) {
+            if (maxBlock <= 0 || maxPrice <= 0 || endBlock <= startBlock) return 0;
+            const startX = startBlock / maxBlock;
+            const startY = startPrice / maxPrice;
+            const endX = endBlock / maxBlock;
+            const endY = endPrice / maxPrice;
+            const rise = endY - startY;
+            const run = endX - startX;
+            if (run === 0) return 90;
+            return Math.atan2(rise, run) * (180 / Math.PI);
+        }
+
+        function calculateStdDev(arr) {
+            if (!arr || arr.length < 2) return 0;
+            const n = arr.length;
+            const mean = arr.reduce((a, b) => a + b) / n;
+            const variance = arr.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / (n - 1);
+            return Math.sqrt(variance);
+        }
+
+        function sigCatStdDev(diff, stdDev) {
+            if (stdDev === 0) return { text: "meh", cls: "sig-meh" };
+            const devs = diff / stdDev;
+            if (devs > 1.5) return { text: "party", cls: "sig-party" };
+            if (devs < -1.5) return { text: "no bueno", cls: "sig-no-bueno" };
+            if (devs > 0.5) return { text: "peachy", cls: "sig-peachy" };
+            if (devs < -0.5) return { text: "watch", cls: "sig-watch" };
+            return { text: "meh", cls: "sig-meh" };
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+
+                const bhResp = await fetch("https://blockstream.info/api/blocks/tip/height");
+                const blockHeight = bhResp.ok ? parseInt(await bhResp.text()) : 0;
+
+                const csvResp = await fetch(`${CSV_URL}?v=${new Date().getTime()}`);
+                if (!csvResp.ok) throw new Error(`Could not load CSV: ${csvResp.statusText}`);
+                const csvText = await csvResp.text();
+                const lines = csvText.split("\n").filter(line => line.trim() && !/^[a-zA-Z]/.test(line));
+                if (lines.length < 2) throw new Error("No valid price data in CSV.");
+
+                const lastLine = lines[lines.length - 1];
+                const lastTimestamp = new Date(Number(lastLine.split(",")[0])).getTime();
+                const daysSinceGenesis = (new Date().getTime() - GENESIS_DATE.getTime()) / (1000 * 60 * 60 * 24);
+                const trueBlocksPerDay = blockHeight > 0 ? (blockHeight / daysSinceGenesis) : 144;
+                const blocksPerMs = trueBlocksPerDay / (24 * 60 * 60 * 1000);
+                const lagMs = new Date().getTime() - lastTimestamp;
+                const lagInBlocks = lagMs * blocksPerMs;
+                const lastDataBlockHeight = blockHeight - lagInBlocks;
+                const calibratedBlockTimeMs = (lastTimestamp - GENESIS_DATE.getTime()) / lastDataBlockHeight;
+
+
+                const historical = parseCsvLines(lines, calibratedBlockTimeMs);
+                historical.sort((a, b) => a.block - b.block);
+
+                const resampledPriceSeries = resampleToBlockIntervals(historical, trueBlocksPerDay);
+                const logReturns = calculateLogReturns(resampledPriceSeries);
+                const acfResult = calculateACF(logReturns, ACF_MAX_LAG);
+                const significantLags = findSignificantLags(acfResult, logReturns.length, 5, ACF_MAX_LAG, trueBlocksPerDay);
+
+                const MICRO_WINDOWS = significantLags.map(lag => ({
+                    label: `${Math.round(lag * trueBlocksPerDay).toLocaleString()} Block Lookback`,
+                    blocks: Math.round(lag * trueBlocksPerDay)
+                }));
+                MICRO_WINDOWS.sort((a, b) => b.blocks - a.blocks);
+
+                document.querySelector('.calculating-overlay').style.display = 'none';
+
+                // Main App Logic
+                const macroEnd = historical[historical.length - 1];
+                const allTimeHigh = Math.max(...historical.map(d => d.price));
+                const latestPrice = macroEnd.price;
+                const latestBlock = macroEnd.block;
+
+                const sevenDaysOfBlocks = 7 * trueBlocksPerDay;
+                const weekAgoBlock = latestBlock - sevenDaysOfBlocks;
+                const weekAgoData = historical.slice().reverse().find(d => d.block <= weekAgoBlock);
+                if (weekAgoData) {
+                    const percentageChange = ((latestPrice - weekAgoData.price) / weekAgoData.price) * 100;
+                    document.getElementById('weeklyMovement').innerHTML = `BTC is <span class="${percentageChange >= 0 ? 'velocity-up' : 'velocity-down'}">${percentageChange >= 0 ? 'up' : 'down'} ${Math.abs(percentageChange).toFixed(1)}%</span> this week`;
+                }
+
+                document.getElementById("blockInfo").style.display = "";
+                document.getElementById("blockInfo").textContent = `Live Block ${blockHeight.toLocaleString()} • Data to Block ${latestBlock.toLocaleString()}`;
+
+                const currentAngle = calculateNormalizedSegmentAngle(0, 0, latestBlock, latestPrice, latestBlock, allTimeHigh);
+
+                document.getElementById("currentAngle").innerHTML = `${currentAngle.toFixed(2)}°<span class="tooltip-icon">?</span><div class="tooltip">...</div>`;
+                document.getElementById("macroPrice").innerHTML = `$${latestPrice.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">...</div>`;
+                document.getElementById("athPrice").innerHTML = `$${allTimeHigh.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">...</div>`;
+
+                const microGrid = document.getElementById("microGrid");
+                microGrid.innerHTML = "";
+                const microResults = [];
+                for (const win of MICRO_WINDOWS) {
+                    const winBlocks = win.blocks;
+                    const startBlock = latestBlock - winBlocks;
+                    let startRow = historical.slice().reverse().find(d => d.block <= startBlock) || historical[0];
+                    const microAngle = calculateNormalizedSegmentAngle(startRow.block, startRow.price, latestBlock, latestPrice, latestBlock, allTimeHigh);
+                    const diff = microAngle - currentAngle;
+                    microResults.push({ win, microAngle, diff });
+                }
+
+                const allDiffs = microResults.map(r => r.diff).filter(d => d !== null && isFinite(d));
+                const stdDev = calculateStdDev(allDiffs);
+
+                for (const res of microResults) {
+                    const cat = sigCatStdDev(res.diff, stdDev);
+                    const card = document.createElement("div");
+                    card.className = "micro-card";
+                    card.innerHTML = `<div class="horizon">${res.win.label}</div><div class="signal ${cat.cls}">${cat.text}</div><div class="detail">${res.diff >= 0 ? '↗' : '↘'} ${res.microAngle.toFixed(1)}°</div>`;
+                    microGrid.appendChild(card);
+                }
+
+                console.log("Deriving consensus weights from PACF...");
+                const pacfValues = calculatePACF(logReturns, ACF_MAX_LAG);
+
+                const rawWeights = microResults.map(res => {
+                    const lagInIntervals = Math.round(res.win.blocks / trueBlocksPerDay);
+                    const lagIndex = lagInIntervals - 1;
+                    if (lagIndex >= 0 && lagIndex < pacfValues.length) {
+                        return Math.abs(pacfValues[lagIndex]);
+                    }
+                    return 0; // Default to 0 if lag is out of bounds
+                });
+
+                const totalRawWeight = rawWeights.reduce((sum, w) => sum + w, 0);
+                const TARGET_WEIGHT_SUM = 15; // Sum of the old static weights [5,4,3,2,1]
+
+                const weights = rawWeights.map(w => (totalRawWeight > 0) ? (w / totalRawWeight) * TARGET_WEIGHT_SUM : 0);
+                console.log("PACF-derived weights:", weights);
+
+                let consensusScore = 0;
+                microResults.forEach((res, index) => {
+                    if (res.diff === null || !isFinite(res.diff)) return;
+                    const cat = sigCatStdDev(res.diff, stdDev).text;
+                    let statusScore = 0;
+                    switch (cat) {
+                        case 'party': statusScore = 2; break; case 'peachy': statusScore = 1; break;
+                        case 'watch': statusScore = -1; break; case 'no bueno': statusScore = -2; break;
+                        default: statusScore = 0;
+                    }
+                    consensusScore += statusScore * weights[index]; // Use the new dynamic weights
+                });
+
+                const finalWordEl = document.getElementById('finalWord');
+                if (consensusScore > 10) {
+                    finalWordEl.textContent = 'yeah'; finalWordEl.className = 'final-answer verdict-yeah';
+                } else if (consensusScore < -10) {
+                    finalWordEl.textContent = 'nah'; finalWordEl.className = 'final-answer verdict-nah';
+                } else { finalWordEl.textContent = 'yeah nah'; finalWordEl.className = 'final-answer verdict-yeah-nah'; }
+
+            } catch (err) {
+                document.getElementById("errorStatus").style.display = "";
+                document.getElementById("errorStatus").textContent = "Error loading: " + err.message;
+                console.error(err);
+            }
+        });
+    </script>
+</body>
+
+</html>
