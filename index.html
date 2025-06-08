@@ -455,16 +455,29 @@
             return lines.map(line => {
                 const cells = line.split(",");
                 let date, price;
-                if (!isNaN(cells[0]) && cells[0].length > 8) {
+                
+                // Handle date string format (YYYY-MM-DD) - the new format
+                if (cells[0].includes('-') && cells[0].length === 10) {
+                    // Date string format: YYYY-MM-DD
+                    date = new Date(cells[0] + 'T00:00:00Z'); // Ensure UTC
+                    price = parseFloat(cells[1]);
+                } else if (!isNaN(cells[0]) && cells[0].length > 8) {
+                    // Legacy timestamp format (milliseconds)
                     date = new Date(Number(cells[0]));
                     price = parseFloat(cells[1]);
                 } else {
+                    // Fallback: try to parse as date
                     date = new Date(cells[0]);
                     price = parseFloat(cells[1]);
                 }
-                if (isNaN(date.getTime()) || isNaN(price)) return null;
+                
+                if (isNaN(date.getTime()) || isNaN(price)) {
+                    console.warn('Failed to parse line:', line);
+                    return null;
+                }
+                
                 const block = Math.floor((date.getTime() - genesisTime) / calibratedBlockTimeMs);
-                return { block, price };
+                return { block, price, date };
             }).filter(d => d && d.block >= 0);
         }
 
@@ -606,21 +619,65 @@
                 const csvResp = await fetch(`${CSV_URL}?v=${new Date().getTime()}`);
                 if (!csvResp.ok) throw new Error(`Could not load CSV: ${csvResp.statusText}`);
                 const csvText = await csvResp.text();
-                const lines = csvText.split("\n").filter(line => line.trim() && !/^[a-zA-Z]/.test(line));
+                const lines = csvText.split("\n").slice(1).filter(line => line.trim());
                 if (lines.length < 2) throw new Error("No valid price data in CSV.");
 
-                const lastLine = lines[lines.length - 1];
-                const lastTimestamp = new Date(Number(lastLine.split(",")[0])).getTime();
-                const daysSinceGenesis = (new Date().getTime() - GENESIS_DATE.getTime()) / (1000 * 60 * 60 * 24);
+                console.log('Sample CSV lines:', lines.slice(0, 3));
+
+                // Get the latest data point for calibration
+                const lastLine = lines[0];
+                const lastCells = lastLine.split(",");
+                
+                let lastTimestamp;
+                if (lastCells[0].includes('-') && lastCells[0].length === 10) {
+                    // Date string format: YYYY-MM-DD
+                    lastTimestamp = new Date(lastCells[0] + 'T00:00:00Z').getTime();
+                    console.log('Parsed date string:', lastCells[0], '-> timestamp:', lastTimestamp);
+                } else {
+                    // Legacy timestamp format
+                    lastTimestamp = new Date(Number(lastCells[0])).getTime();
+                    console.log('Parsed timestamp:', lastCells[0], '-> timestamp:', lastTimestamp);
+                }
+
+                if (isNaN(lastTimestamp)) {
+                    throw new Error(`Could not parse last date: ${lastCells[0]}`);
+                }
+
+                const nowMs = new Date().getTime();
+                const daysSinceGenesis = (nowMs - GENESIS_DATE.getTime()) / (1000 * 60 * 60 * 24);
                 const trueBlocksPerDay = blockHeight > 0 ? (blockHeight / daysSinceGenesis) : 144;
                 const blocksPerMs = trueBlocksPerDay / (24 * 60 * 60 * 1000);
-                const lagMs = new Date().getTime() - lastTimestamp;
+                const lagMs = nowMs - lastTimestamp;
                 const lagInBlocks = lagMs * blocksPerMs;
                 const lastDataBlockHeight = blockHeight - lagInBlocks;
+                
+                console.log('Debug info:');
+                console.log('- Block height from API:', blockHeight);
+                console.log('- Last data timestamp:', new Date(lastTimestamp).toISOString());
+                console.log('- Current time:', new Date(nowMs).toISOString());
+                console.log('- Days since genesis:', daysSinceGenesis.toFixed(2));
+                console.log('- True blocks per day:', trueBlocksPerDay.toFixed(2));
+                console.log('- Lag in ms:', lagMs);
+                console.log('- Lag in blocks:', lagInBlocks.toFixed(2));
+                console.log('- Calculated last data block height:', lastDataBlockHeight.toFixed(2));
+                
+                if (lastDataBlockHeight <= 0) {
+                    throw new Error(`Invalid block height calculation. Block height: ${blockHeight}, lag in blocks: ${lagInBlocks.toFixed(2)}, resulting in: ${lastDataBlockHeight.toFixed(2)}`);
+                }
+                
                 const calibratedBlockTimeMs = (lastTimestamp - GENESIS_DATE.getTime()) / lastDataBlockHeight;
+                
+                if (calibratedBlockTimeMs <= 0) {
+                    throw new Error(`Invalid block time calculation: ${calibratedBlockTimeMs}`);
+                }
 
+                console.log('Calibrated block time (ms):', calibratedBlockTimeMs);
+                console.log('True blocks per day:', trueBlocksPerDay);
 
                 const historical = parseCsvLines(lines, calibratedBlockTimeMs);
+                console.log('Parsed historical data points:', historical.length);
+                console.log('Sample historical data:', historical.slice(0, 3));
+                
                 historical.sort((a, b) => a.block - b.block);
 
                 const resampledPriceSeries = resampleToBlockIntervals(historical, trueBlocksPerDay);
@@ -642,6 +699,10 @@
                 const latestPrice = macroEnd.price;
                 const latestBlock = macroEnd.block;
 
+                console.log('Latest price:', latestPrice);
+                console.log('Latest block:', latestBlock);
+                console.log('All time high:', allTimeHigh);
+
                 const sevenDaysOfBlocks = 7 * trueBlocksPerDay;
                 const weekAgoBlock = latestBlock - sevenDaysOfBlocks;
                 const weekAgoData = historical.slice().reverse().find(d => d.block <= weekAgoBlock);
@@ -655,9 +716,9 @@
 
                 const currentAngle = calculateNormalizedSegmentAngle(0, 0, latestBlock, latestPrice, latestBlock, allTimeHigh);
 
-                document.getElementById("currentAngle").innerHTML = `${currentAngle.toFixed(2)}°<span class="tooltip-icon">?</span><div class="tooltip">...</div>`;
-                document.getElementById("macroPrice").innerHTML = `$${latestPrice.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">...</div>`;
-                document.getElementById("athPrice").innerHTML = `$${allTimeHigh.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">...</div>`;
+                document.getElementById("currentAngle").innerHTML = `${currentAngle.toFixed(2)}°<span class="tooltip-icon">?</span><div class="tooltip">This is our dynamic benchmark. It's the angle of the line from Bitcoin's origin to its current price. Recent momentum is compared against this angle.</div>`;
+                document.getElementById("macroPrice").innerHTML = `$${latestPrice.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's price at the most recent data point.</div>`;
+                document.getElementById("athPrice").innerHTML = `$${allTimeHigh.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's highest recorded price. This defines the top of our geometric chart.</div>`;
 
                 const microGrid = document.getElementById("microGrid");
                 microGrid.innerHTML = "";
@@ -706,8 +767,10 @@
                     const cat = sigCatStdDev(res.diff, stdDev).text;
                     let statusScore = 0;
                     switch (cat) {
-                        case 'party': statusScore = 2; break; case 'peachy': statusScore = 1; break;
-                        case 'watch': statusScore = -1; break; case 'no bueno': statusScore = -2; break;
+                        case 'party': statusScore = 2; break; 
+                        case 'peachy': statusScore = 1; break;
+                        case 'watch': statusScore = -1; break; 
+                        case 'no bueno': statusScore = -2; break;
                         default: statusScore = 0;
                     }
                     consensusScore += statusScore * weights[index]; // Use the new dynamic weights
@@ -718,7 +781,9 @@
                     finalWordEl.textContent = 'yeah'; finalWordEl.className = 'final-answer verdict-yeah';
                 } else if (consensusScore < -10) {
                     finalWordEl.textContent = 'nah'; finalWordEl.className = 'final-answer verdict-nah';
-                } else { finalWordEl.textContent = 'yeah nah'; finalWordEl.className = 'final-answer verdict-yeah-nah'; }
+                } else { 
+                    finalWordEl.textContent = 'yeah nah'; finalWordEl.className = 'final-answer verdict-yeah-nah'; 
+                }
 
             } catch (err) {
                 document.getElementById("errorStatus").style.display = "";

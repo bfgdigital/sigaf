@@ -6,117 +6,189 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 BUCKET_NAME = 'bfg-btc-price-history'
-KEY = 'btc-price-history-data.csv'
+KEY = 'data/btc-price-history-data.csv'
 
 """
-This is a pretty basic lambda that updates the CSV in S3 with the latest data from CoinGecko.
-It also checks for gaps in the last 7 days and extends the fetch window to 27 days if there are gaps.
-It then writes the data back to S3.
-
-You might need to prep or update the csv before running this, but this will then keep it up to date.
+This lambda updates the BTC price history CSV in S3 by fetching the latest data from CoinGecko.
+It only fetches data if there are missing dates, and provides clear status messages.
+Data is stored with dates in YYYY-MM-DD format instead of timestamps.
 """
 
 def lambda_handler(event, context):
     s3 = boto3.client('s3')
 
-    # Download the CSV from S3
+    # Download existing CSV from S3
     obj = s3.get_object(Bucket=BUCKET_NAME, Key=KEY)
     body = obj['Body'].read().decode('utf-8').strip().splitlines()
     rows = list(csv.reader(body))
     header = rows[0]
 
-    # Index all rows by day (UTC midnight)
-    data_by_day = {}
+    # Index existing rows by date string (YYYY-MM-DD format)
+    data_by_date = {}
     for row in rows[1:]:
         try:
-            ts = int(row[0])
-            dt = datetime.fromtimestamp(ts // 1000, timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            data_by_day[dt] = row
+            # Assuming first column is date string in YYYY-MM-DD format
+            date_str = row[0]
+            # Validate date format
+            datetime.strptime(date_str, '%Y-%m-%d')
+            data_by_date[date_str] = row
         except Exception:
             continue
 
-    # Check last 7 days for gaps, using yesterday as reference
-    yesterday = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
-    check_start = yesterday - timedelta(days=6)  # Check last 7 days
+    # Compute yesterday date (UTC) - we never process "today" as API data is incomplete
+    now_utc = datetime.now(timezone.utc)
+    today_dt = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_dt = today_dt - timedelta(days=1)
+    yesterday_date_str = yesterday_dt.strftime('%Y-%m-%d')
     
-    # Check for gaps in the last 7 days
-    has_gaps = False
+    print(f"Today (UTC): {today_dt.strftime('%Y-%m-%d')}")
+    print(f"Checking for data up to yesterday (UTC): {yesterday_date_str}")
+
+    # Check if yesterday's data already exists
+    if yesterday_date_str in data_by_date:
+        print(f"Yesterday's data ({yesterday_date_str}) already exists")
+        
+        # Check for any gaps in the last 7 days
+        check_start_dt = yesterday_dt - timedelta(days=6)
+        missing_dates = []
+        for i in range(7):
+            check_date = check_start_dt + timedelta(days=i)
+            check_date_str = check_date.strftime('%Y-%m-%d')
+            if check_date_str not in data_by_date:
+                missing_dates.append(check_date_str)
+        
+        if not missing_dates:
+            return {
+                'status': 'no_update_needed',
+                'message': 'All data up to yesterday is already present',
+                'latest_date': yesterday_date_str,
+                'total_rows': len(data_by_date),
+                's3_key': KEY
+            }
+        else:
+            print(f"Found {len(missing_dates)} missing dates in last 7 days: {missing_dates}")
+            # Continue to fetch data to fill gaps
+    else:
+        print(f"Yesterday's data ({yesterday_date_str}) is missing")
+
+    # Determine what dates we need to fetch
+    check_start_dt = yesterday_dt - timedelta(days=6)
+    missing_dates = []
     for i in range(7):
-        check_date = check_start + timedelta(days=i)
-        if check_date > yesterday:
-            break
-        if check_date not in data_by_day:
-            has_gaps = True
-            break
+        check_date = check_start_dt + timedelta(days=i)
+        check_date_str = check_date.strftime('%Y-%m-%d')
+        if check_date_str not in data_by_date:
+            missing_dates.append(check_date_str)
 
-    # Determine how many days to fetch
-    days_to_patch = 7
-    if has_gaps:
-        days_to_patch = 27  # 7 days + 20 extra days to fill gaps
-        print(f"Found gaps in last 7 days, extending fetch window to {days_to_patch} days")
+    # If we have gaps, extend the window to 27 days to be thorough
+    if len(missing_dates) > 1:
+        print(f"Multiple gaps detected, extending fetch window to 27 days")
+        days_to_fetch = 27
+        fetch_start_dt = yesterday_dt - timedelta(days=26)
+        
+        # Recalculate missing dates for extended window
+        missing_dates = []
+        for i in range(27):
+            check_date = fetch_start_dt + timedelta(days=i)
+            check_date_str = check_date.strftime('%Y-%m-%d')
+            if check_date_str not in data_by_date:
+                missing_dates.append(check_date_str)
+    else:
+        days_to_fetch = 7
+        fetch_start_dt = check_start_dt
+
+    print(f"Need to fetch {len(missing_dates)} missing dates: {missing_dates}")
+
+    # Fetch data from CoinGecko
+    url = (
+        f'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart'
+        f'?vs_currency=usd&days={days_to_fetch+1}&interval=daily'
+    )
     
-    patch_start = yesterday - timedelta(days=days_to_patch - 1)
-
-    url = f'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days={days_to_patch+1}&interval=daily'
+    print(f"Fetching data from CoinGecko for {days_to_fetch} days")
     with urllib.request.urlopen(url) as response:
         data = json.loads(response.read().decode('utf-8'))
 
-    # Build dicts: dt -> price/volume/market_cap
+    # Build maps: date_string -> value (only for missing dates)
     price_map = {}
     volume_map = {}
     market_cap_map = {}
-    
+
     for ts, price in data.get('prices', []):
-        dt = datetime.fromtimestamp(ts // 1000, timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        if dt <= yesterday:  # Only use data up to yesterday
-            price_map[dt] = price
-        
+        dt = datetime.fromtimestamp(ts // 1000, timezone.utc)
+        date_str = dt.strftime('%Y-%m-%d')
+        # Only process data up to yesterday and only for missing dates
+        if dt.date() <= yesterday_dt.date() and date_str in missing_dates:
+            price_map[date_str] = price
+
     for ts, volume in data.get('total_volumes', []):
-        dt = datetime.fromtimestamp(ts // 1000, timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        if dt <= yesterday:  # Only use data up to yesterday
-            volume_map[dt] = volume
-        
+        dt = datetime.fromtimestamp(ts // 1000, timezone.utc)
+        date_str = dt.strftime('%Y-%m-%d')
+        # Only process data up to yesterday and only for missing dates
+        if dt.date() <= yesterday_dt.date() and date_str in missing_dates:
+            volume_map[date_str] = volume
+
     for ts, market_cap in data.get('market_caps', []):
-        dt = datetime.fromtimestamp(ts // 1000, timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        if dt <= yesterday:  # Only use data up to yesterday
-            market_cap_map[dt] = market_cap
+        dt = datetime.fromtimestamp(ts // 1000, timezone.utc)
+        date_str = dt.strftime('%Y-%m-%d')
+        # Only process data up to yesterday and only for missing dates
+        if dt.date() <= yesterday_dt.date() and date_str in missing_dates:
+            market_cap_map[date_str] = market_cap
 
-    # Patch these days in memory
-    patched_days = 0
-    for i in range(days_to_patch):
-        dt = patch_start + timedelta(days=i)
-        if dt > yesterday:  # Stop at yesterday
-            break
-        price = price_map.get(dt)
-        volume = volume_map.get(dt)
-        market_cap = market_cap_map.get(dt)
-        if price is not None and volume is not None and market_cap is not None:
-            unix_ts = int(dt.timestamp()) * 1000
-            # Store raw values without formatting to preserve precision
-            data_by_day[dt] = [str(unix_ts), str(price), str(volume), str(market_cap)]
-            patched_days += 1
+    # Add only the missing dates that we have complete data for
+    added_dates = []
+    for date_str in missing_dates:
+        if (date_str in price_map and 
+            date_str in volume_map and 
+            date_str in market_cap_map):
+            
+            price = price_map[date_str]
+            volume = volume_map[date_str]
+            market_cap = market_cap_map[date_str]
+            
+            data_by_date[date_str] = [
+                date_str,
+                str(price),
+                str(volume),
+                str(market_cap),
+            ]
+            added_dates.append(date_str)
+            print(f"Added data for {date_str}")
 
-    # Rebuild all rows (sorted by timestamp descending)
-    all_rows = list(data_by_day.values())
-    all_rows_sorted = sorted(all_rows, key=lambda r: int(r[0]), reverse=True)  # Changed to reverse=True for descending order
+    # Only upload if we actually added new data
+    if not added_dates:
+        return {
+            'status': 'no_new_data',
+            'message': 'API did not return data for missing dates',
+            'missing_dates': missing_dates,
+            'total_rows': len(data_by_date),
+            's3_key': KEY
+        }
+
+    # Rebuild all rows, sorted descending by date
+    all_rows = list(data_by_date.values())
+    all_rows_sorted = sorted(all_rows, key=lambda r: r[0], reverse=True)
 
     # Write back to CSV in-memory
     output = io.StringIO()
     writer = csv.writer(output, lineterminator='\n')
     writer.writerow(header)
     writer.writerows(all_rows_sorted)
-    output.seek(0)
-    csv_bytes = output.read().encode('utf-8')
+    csv_bytes = output.getvalue().encode('utf-8')
 
-    # Upload to S3
-    s3.put_object(Bucket=BUCKET_NAME, Key=KEY, Body=csv_bytes, ContentType='text/csv')
+    # Upload updated CSV to S3
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=KEY,
+        Body=csv_bytes,
+        ContentType='text/csv'
+    )
 
     return {
-        'status': 'patched',
-        'days_patched': patched_days,
-        'patch_window_start': patch_start.strftime('%Y-%m-%d'),
-        'patch_window_end': yesterday.strftime('%Y-%m-%d'),
+        'status': 'updated',
+        'message': f'Successfully added {len(added_dates)} new dates',
+        'added_dates': sorted(added_dates),
+        'fetch_window_days': days_to_fetch,
         'total_rows': len(all_rows_sorted),
-        's3_key': KEY,
-        'extended_fetch': has_gaps
+        's3_key': KEY
     }
