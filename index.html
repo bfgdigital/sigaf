@@ -774,12 +774,26 @@
                 });
 
                 const finalWordEl = document.getElementById('finalWord');
-                if (consensusScore > 10) {
-                    finalWordEl.textContent = 'yeah'; finalWordEl.className = 'final-answer verdict-yeah';
-                } else if (consensusScore < -10) {
-                    finalWordEl.textContent = 'nah'; finalWordEl.className = 'final-answer verdict-nah';
-                } else {
-                    finalWordEl.textContent = 'yeah nah'; finalWordEl.className = 'final-answer verdict-yeah-nah';
+
+                // A large NEGATIVE score means "no bueno" / "watch".
+                // This is when you SHOULD give a fuck.
+                if (consensusScore < -10) {
+                    finalWordEl.textContent = 'yeah'; // "Yeah", give a fuck.
+                    finalWordEl.className = 'final-answer verdict-nah'; // Use the RED class for the alert.
+                } 
+                
+                // A large POSITIVE score means "party" / "peachy".
+                // This is when you DON'T need to give a fuck.
+                else if (consensusScore > 10) { 
+                    finalWordEl.textContent = 'nah'; // "Nah", don't worry.
+                    finalWordEl.className = 'final-answer verdict-yeah'; // Use the GREEN class for "all clear".
+                } 
+                
+                // The score is in the middle.
+                // This is the "usual" case.
+                else { 
+                    finalWordEl.textContent = 'yeah nah'; // "Yeah nah", just the usual.
+                    finalWordEl.className = 'final-answer verdict-yeah-nah'; // Keep the AMBER class for neutral.
                 }
 
             } catch (err) {
