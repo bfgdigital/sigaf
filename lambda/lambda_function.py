@@ -44,7 +44,8 @@ def lambda_handler(event, context):
     print(f"Today (UTC): {today_dt.strftime('%Y-%m-%d')}")
     print(f"Checking for data up to yesterday (UTC): {yesterday_date_str}")
 
-    # Check if yesterday's data already exists
+    # Check if yesterday's data already exists.
+    # API's have incomplete data, so just work from yesterday's data.
     if yesterday_date_str in data_by_date:
         print(f"Yesterday's data ({yesterday_date_str}) already exists")
         
