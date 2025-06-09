@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Bitcoin "Should I Give a Fuck" Meter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../css/styles.css">
+    <script type="module">
+        import { CONFIG } from '../js/config.js';
+        import * as analysis from '../js/analysis.js';
+        window.CONFIG = CONFIG;
+        window.analysis = analysis;
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="weekly-movement" id="weeklyMovement"></div>
+            <h1 class="main-title" id="mainTitle">Should I Give A Fuck?</h1>
+            <div class="block-info" id="blockInfo" style="display: none"></div>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <div class="section-title">Geometric Benchmark</div>
+                <table class="macro-table">
+                    <tr>
+                        <td>
+                            <span class="label">Current Trend Angle</span>
+                            <span class="value" id="currentAngle">—<span class="tooltip-icon">?</span>
+                                <div class="tooltip">
+                                    This is our dynamic benchmark. It's the
+                                    angle of the line from Bitcoin's origin
+                                    to its current price, normalized within
+                                    a 1x1 box (Time vs Price/ATH). Recent
+                                    momentum is compared against this angle.
+                                </div>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="label">ATH Benchmark</span>
+                            <span class="value" id="benchmarkAngle">45°<span class="tooltip-icon">?</span>
+                                <div class="tooltip">
+                                    The theoretical ideal. This represents a
+                                    perfect, straight line from origin to
+                                    the All-Time High price on the
+                                    normalized chart. It serves as a fixed
+                                    reference point.
+                                </div>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="label">Current Price</span>
+                            <span class="value" id="macroPrice">—<span class="tooltip-icon-subtle">?</span>
+                                <div class="tooltip">
+                                    Bitcoin's price at the most recent data
+                                    point.
+                                </div>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="label">All Time High</span>
+                            <span class="value" id="athPrice">—<span class="tooltip-icon-subtle">?</span>
+                                <div class="tooltip">
+                                    Bitcoin's highest recorded price. This
+                                    defines the top of our geometric chart.
+                                </div>
+                            </span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    Recent Momentum (Geometrically Derived Lookbacks)
+                </div>
+                <div class="micro-grid" id="microGrid">
+                    <div class="calculating-overlay">
+                        Calibrating & Analyzing...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="final-word">
+            <div class="final-question">
+                So, should you give a fuck about the price of Bitcoin?
+            </div>
+            <div class="final-answer" id="finalWord">...</div>
+        </div>
+
+        <div class="footer">
+            <div class="footer-text">
+                Each horizon shows the velocity and direction of recent
+                price movement.<br />
+                If the consensus of signals is strongly negative, then you
+                should give a fuck.
+            </div>
+            <a href="wtfit.html" class="footer-link">Read the full explanation →</a>
+            <div class="error" id="errorStatus" style="display: none"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import {
+            parseCsvLines,
+            calculateQuadraticFit,
+            generateLookbacksAlongMacroActual,
+            calculateNormalizedSegmentAngle,
+            calculateStdDev,
+            sigCatStdDev
+        } from '../js/analysis.js';
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const bhResp = await fetch(
+                    "https://blockstream.info/api/blocks/tip/height",
+                );
+                const blockHeight = bhResp.ok
+                    ? parseInt(await bhResp.text())
+                    : 0;
+                const csvResp = await fetch(
+                    `${CONFIG.CSV_URL}?v=${new Date().getTime()}`,
+                );
+                if (!csvResp.ok)
+                    throw new Error(
+                        `Could not load CSV: ${csvResp.statusText}`,
+                    );
+                const csvText = await csvResp.text();
+                const lines = csvText
+                    .split("\n")
+                    .slice(1)
+                    .filter((line) => line.trim());
+                if (lines.length < 2)
+                    throw new Error("No valid price data in CSV.");
+
+                //  Calibrate Time-to-Block Conversion
+                const lastLine = lines[0];
+                const lastCells = lastLine.split(",");
+                let lastTimestamp;
+                if (
+                    lastCells[0].includes("-") &&
+                    lastCells[0].length === 10
+                )
+                    lastTimestamp = new Date(
+                        lastCells[0] + "T00:00:00Z",
+                    ).getTime();
+                else
+                    lastTimestamp = new Date(
+                        Number(lastCells[0]),
+                    ).getTime();
+                if (isNaN(lastTimestamp))
+                    throw new Error(
+                        `Could not parse last date: ${lastCells[0]}`,
+                    );
+                const daysSinceGenesis =
+                    (new Date().getTime() - CONFIG.GENESIS_DATE.getTime()) /
+                    (1000 * 60 * 60 * 24);
+                const trueBlocksPerDay =
+                    blockHeight > 0 ? blockHeight / daysSinceGenesis : 144;
+                const lastDataBlockHeight =
+                    blockHeight -
+                    (new Date().getTime() - lastTimestamp) *
+                    (trueBlocksPerDay / (24 * 60 * 60 * 1000));
+                if (lastDataBlockHeight <= 0)
+                    throw new Error(`Invalid block height calculation.`);
+                const calibratedBlockTimeMs =
+                    (lastTimestamp - CONFIG.GENESIS_DATE.getTime()) /
+                    lastDataBlockHeight;
+                if (calibratedBlockTimeMs <= 0)
+                    throw new Error(`Invalid block time calculation.`);
+
+                const historical = parseCsvLines(
+                    lines,
+                    calibratedBlockTimeMs,
+                ).sort((a, b) => a.block - b.block);
+                document.querySelector(
+                    ".calculating-overlay",
+                ).style.display = "none";
+
+                // Main App Logic
+                const macroEnd = historical[historical.length - 1];
+                const allTimeHigh = Math.max(
+                    ...historical.map((d) => d.price),
+                );
+                const latestPrice = macroEnd.price;
+                const latestBlock = macroEnd.block;
+
+                document.getElementById("blockInfo").style.display = "";
+                document.getElementById("blockInfo").textContent =
+                    `Live Block ${blockHeight.toLocaleString()} • Data to Block ${latestBlock.toLocaleString()}`;
+
+                // Calculate Benchmarks
+                const currentAngle = calculateNormalizedSegmentAngle(
+                    0,
+                    0,
+                    latestBlock,
+                    latestPrice,
+                    latestBlock,
+                    allTimeHigh,
+                );
+                document.getElementById("currentAngle").innerHTML =
+                    `${currentAngle.toFixed(2)}°<span class="tooltip-icon">?</span><div class="tooltip">This is our dynamic benchmark. It's the angle of the line from Bitcoin's origin to its current price, normalized within a 1x1 box (Time vs Price/ATH). Recent momentum is compared against this angle.</div>`;
+                document.getElementById("macroPrice").innerHTML =
+                    `$${latestPrice.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's price at the most recent data point.</div>`;
+                document.getElementById("athPrice").innerHTML =
+                    `$${allTimeHigh.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's highest recorded price. This defines the top of our geometric chart.</div>`;
+
+                // Curvature Calculation
+                const normData = historical.map((d) => ({
+                    x: d.block / latestBlock,
+                    y: d.price / allTimeHigh,
+                }));
+                const { a: curvature } = calculateQuadraticFit(normData);
+
+                // Macro actual slope for lookbacks
+                const macroActualSlope = latestPrice / allTimeHigh;
+
+                // Generate and Analyze Consistent Lookbacks (curvature modulated along macro actual line)
+                const lookbackPeriods = generateLookbacksAlongMacroActual(
+                    latestBlock,
+                    curvature,
+                    CONFIG.GEO_MODEL_CONFIG,
+                    macroActualSlope,
+                );
+
+                const microGrid = document.getElementById("microGrid");
+                microGrid.innerHTML = "";
+                const analysisResults = [];
+
+                for (const lookback of lookbackPeriods) {
+                    const startBlock = latestBlock - lookback;
+                    if (startBlock <= 0) continue;
+                    const startRow =
+                        historical
+                            .slice()
+                            .reverse()
+                            .find((d) => d.block <= startBlock) ||
+                        historical[0];
+                    const microAngle = calculateNormalizedSegmentAngle(
+                        startRow.block,
+                        startRow.price,
+                        latestBlock,
+                        latestPrice,
+                        latestBlock,
+                        allTimeHigh,
+                    );
+                    analysisResults.push({
+                        lookback,
+                        deviation: microAngle - currentAngle,
+                        microAngle,
+                    });
+                }
+
+                // Calculate Final Verdict from an unweighted, pure consensus
+                const allDiffs = analysisResults.map((r) => r.deviation);
+                // Sort results to display the longest lookback first (on the left)
+                analysisResults.sort((a, b) => b.lookback - a.lookback);
+                const stdDev = calculateStdDev(allDiffs);
+                let consensusScore = 0;
+
+                for (const res of analysisResults) {
+                    const cat = sigCatStdDev(res.deviation, stdDev);
+                    const card = document.createElement("div");
+                    card.className = "micro-card";
+                    card.innerHTML = `<div class="horizon">${res.lookback.toLocaleString()} Block Lookback</div><div class="signal ${cat.cls}">${cat.text}</div><div class="detail">${res.deviation >= 0 ? "↗" : "↘"} ${res.microAngle.toFixed(1)}°</div>`;
+                    microGrid.appendChild(card);
+
+                    let statusScore = 0;
+                    switch (cat.text) {
+                        case "party":
+                            statusScore = 2;
+                            break;
+                        case "peachy":
+                            statusScore = 1;
+                            break;
+                        case "watch":
+                            statusScore = -1;
+                            break;
+                        case "no bueno":
+                            statusScore = -2;
+                            break;
+                    }
+                    consensusScore += statusScore; // Unweighted sum for a pure consensus
+                }
+
+                // Normalize the score. Max possible is 10 (5 * 2). Min is -10.
+                const maxRawScore =
+                    CONFIG.GEO_MODEL_CONFIG.numFinalLookbacks * 2;
+                consensusScore =
+                    (consensusScore / maxRawScore) *
+                    CONFIG.UI_CONFIG.finalScoreScale;
+
+                // --- Display Final Verdict ---
+                const finalWordEl = document.getElementById("finalWord");
+                if (consensusScore < CONFIG.UI_CONFIG.negativeThreshold) {
+                    finalWordEl.textContent = "Yep..";
+                    finalWordEl.className = "final-answer verdict-no";
+                } else if (
+                    consensusScore > CONFIG.UI_CONFIG.positiveThreshold
+                ) {
+                    finalWordEl.textContent = "No.";
+                    finalWordEl.className = "final-answer verdict-yep";
+                } else {
+                    finalWordEl.textContent = "Yeah Nah";
+                    finalWordEl.className = "final-answer verdict-yeah-nah";
+                }
+            } catch (err) {
+                document.getElementById("errorStatus").style.display = "";
+                document.getElementById("errorStatus").textContent =
+                    "Error loading: " + err.message;
+                console.error(err);
+            }
+        });
+    </script>
+</body>
+
+</html>
