@@ -24,7 +24,7 @@
 
         <div class="content">
             <div class="section">
-                <div class="section-title">Geometric Benchmark</div>
+                <div class="section-title">Macro View - HOW IS BITCOIN DOING RELATIVE TO ITS ENTIRE HISTORY?</div>
                 <table class="macro-table">
                     <tr>
                         <td>
@@ -55,8 +55,7 @@
                             <span class="label">Current Price</span>
                             <span class="value" id="macroPrice">—<span class="tooltip-icon-subtle">?</span>
                                 <div class="tooltip">
-                                    Bitcoin's price at the most recent data
-                                    point.
+                                    Bitcoin's price. Updated live if possible, otherwise from the latest data point.
                                 </div>
                             </span>
                         </td>
@@ -75,7 +74,7 @@
 
             <div class="section">
                 <div class="section-title">
-                    Recent Momentum (Geometrically Derived Lookbacks)
+                    Micro View - How is Bitcoin doing relative to its recent history?
                 </div>
                 <div class="micro-grid" id="microGrid">
                     <div class="calculating-overlay">
@@ -113,6 +112,19 @@
             calculateStdDev,
             sigCatStdDev
         } from '../js/analysis.js';
+
+        // --- ADDED: Live price fetching function with fallback ---
+        async function getLiveBitcoinPrice() {
+            try {
+                const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+                if (!response.ok) throw new Error('CoinGecko API request failed');
+                const data = await response.json();
+                return data.bitcoin.usd;
+            } catch (error) {
+                console.warn("Could not fetch live price, will use latest price from CSV.", error.message);
+                return null;
+            }
+        }
 
         document.addEventListener("DOMContentLoaded", async () => {
             try {
@@ -189,23 +201,40 @@
                 const latestPrice = macroEnd.price;
                 const latestBlock = macroEnd.block;
 
+                // --- ADDED: Get live price and set the price to be used for display and calcs ---
+                const livePrice = await getLiveBitcoinPrice();
+                const displayPrice = livePrice || latestPrice;
+
+
                 document.getElementById("blockInfo").style.display = "";
                 document.getElementById("blockInfo").textContent =
                     `Live Block ${blockHeight.toLocaleString()} • Data to Block ${latestBlock.toLocaleString()}`;
+
+
+                // --- ADDED: Weekly price movement calculation ---
+                const weekAgoBlock = latestBlock - (7 * trueBlocksPerDay);
+                const weekAgoData = historical.slice().reverse().find(d => d.block <= weekAgoBlock);
+                if (weekAgoData) {
+                    const percentageChange = ((displayPrice - weekAgoData.price) / weekAgoData.price) * 100;
+                    const movementClass = percentageChange >= 0 ? 'velocity-up' : 'velocity-down';
+                    const movementText = percentageChange >= 0 ? 'up' : 'down';
+                    document.getElementById('weeklyMovement').innerHTML =
+                        `BTC is <span class="${movementClass}">${movementText} ${Math.abs(percentageChange).toFixed(1)}%</span> this week`;
+                }
 
                 // Calculate Benchmarks
                 const currentAngle = calculateNormalizedSegmentAngle(
                     0,
                     0,
                     latestBlock,
-                    latestPrice,
+                    displayPrice, // Use displayPrice here
                     latestBlock,
                     allTimeHigh,
                 );
                 document.getElementById("currentAngle").innerHTML =
                     `${currentAngle.toFixed(2)}°<span class="tooltip-icon">?</span><div class="tooltip">This is our dynamic benchmark. It's the angle of the line from Bitcoin's origin to its current price, normalized within a 1x1 box (Time vs Price/ATH). Recent momentum is compared against this angle.</div>`;
                 document.getElementById("macroPrice").innerHTML =
-                    `$${latestPrice.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's price at the most recent data point.</div>`;
+                    `$${displayPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's price. Updated live if possible, otherwise from the latest data point.</div>`;
                 document.getElementById("athPrice").innerHTML =
                     `$${allTimeHigh.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's highest recorded price. This defines the top of our geometric chart.</div>`;
 
@@ -217,7 +246,7 @@
                 const { a: curvature } = calculateQuadraticFit(normData);
 
                 // Macro actual slope for lookbacks
-                const macroActualSlope = latestPrice / allTimeHigh;
+                const macroActualSlope = displayPrice / allTimeHigh; // Use displayPrice here
 
                 // Generate and Analyze Consistent Lookbacks (curvature modulated along macro actual line)
                 const lookbackPeriods = generateLookbacksAlongMacroActual(
@@ -244,7 +273,7 @@
                         startRow.block,
                         startRow.price,
                         latestBlock,
-                        latestPrice,
+                        displayPrice, // Use displayPrice here
                         latestBlock,
                         allTimeHigh,
                     );
@@ -302,10 +331,10 @@
                 } else if (
                     consensusScore > CONFIG.UI_CONFIG.positiveThreshold
                 ) {
-                    finalWordEl.textContent = "No.";
+                    finalWordEl.textContent = "No. Tick-tock, next block..";
                     finalWordEl.className = "final-answer verdict-yep";
                 } else {
-                    finalWordEl.textContent = "Yeah Nah";
+                    finalWordEl.textContent = "Yeah-Nah";
                     finalWordEl.className = "final-answer verdict-yeah-nah";
                 }
             } catch (err) {
