@@ -103,15 +103,21 @@
                 is its deviation ($Δ$).
             </p>
             <pre><code>Δ = θ_micro - θ_macro</code></pre>
-            <p>
-                The status (e.g.,
-                <span class="sig-label sig-party">PARTY</span>,
-                <span class="sig-label sig-no-bueno">NO BUENO</span>) is
-                assigned based on how many standard deviations this delta is
-                from the average of all five current deltas. This makes the
-                signals inherently adaptive to recent volatility.
-            </p>
 
+            <p>
+                The status is assigned based on how many standard deviations ($σ$) its delta is from the average of all five current deltas. This makes the signals inherently adaptive to recent volatility.
+            </p>
+            
+            <div class="status-definitions">
+                <ul>
+                    <li><span class="sig-label sig-party">PARTY</span>: Indicates strong positive momentum, when the deviation is more than 1.5 standard deviations above the average ($Δ > 1.5σ$).</li>
+                    <li><span class="sig-label sig-peachy">PEACHY</span>: Indicates mild positive momentum, for deviations between 0.5 and 1.5 standard deviations ($0.5σ < Δ \le 1.5σ$).</li>
+                    <li><span class="sig-label sig-meh">MEH</span>: Indicates neutral momentum, with a deviation within half a standard deviation of the average ($-0.5σ \le Δ \le 0.5σ$).</li>
+                    <li><span class="sig-label sig-watch">WATCH</span>: Indicates mild negative momentum, for deviations between -0.5 and -1.5 standard deviations ($-1.5σ \le Δ < -0.5σ$).</li>
+                    <li><span class="sig-label sig-no-bueno">NO BUENO</span>: Indicates strong negative momentum, when the deviation is more than 1.5 standard deviations below the average ($Δ < -1.5σ$).</li>
+                </ul>
+            </div>
+            
             <h3>3. Reaching an Unweighted Consensus</h3>
             <p>
                 Each horizon casts a "vote" from +2 to -2 based on its

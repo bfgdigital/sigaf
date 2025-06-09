@@ -115,6 +115,33 @@ body {
     position: relative;
 }
 
+.status-definitions {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 1.5em 0;
+}
+
+.status-definitions ul {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.status-definitions li {
+    padding-bottom: 0.8em;
+    margin-bottom: 0.8em;
+    border-bottom: 1px solid #e9ecef;
+    line-height: 1.5;
+}
+
+.status-definitions li:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
 .tooltip {
     position: fixed;
     background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);

@@ -509,8 +509,7 @@
                         document.getElementById("macroChart");
                     const microCanvas =
                         document.getElementById("microChart");
-                    const canvasSize =
-                        macroCanvas.getBoundingClientRect().width;
+                        const canvasSize = macroCanvas.parentElement.getBoundingClientRect().width;
                     macroCanvas.width = canvasSize;
                     macroCanvas.height = canvasSize;
                     microCanvas.width = canvasSize;
