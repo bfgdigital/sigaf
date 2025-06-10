@@ -1,7 +1,7 @@
 // Configuration for the Bitcoin "Should I Care" Meter
 export const CONFIG = {
     // --- Data Source ---
-    CSV_URL: "./data/btc-price-history-data.csv",
+    CSV_URL: "/data/btc-price-history-data.csv",
     GENESIS_DATE: new Date("2009-01-03T00:00:00Z"),
 
     // --- UI & Verdict Thresholds ---
