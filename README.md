@@ -1,4 +1,4 @@
-# SIGAF (Should I Give A Fuck)
+# SIGAF (Should I Care)
 
 A simple dashboard that tells you at a glance whether you should care about what Bitcoin is doing right now. No fancy charts, no complicated lines to figure out - just a clear signal about Bitcoin's current momentum.
 

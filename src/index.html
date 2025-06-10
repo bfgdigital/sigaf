@@ -3,12 +3,12 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Bitcoin "Should I Give a Fuck" Meter</title>
+    <title>Bitcoin "Should I Care" Meter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="css/styles.css">
     <script type="module">
-        import { CONFIG } from '/js/config.js';
-        import * as analysis from '/js/analysis.js';
+        import { CONFIG } from './js/config.js';
+        import * as analysis from './js/analysis.js';
         window.CONFIG = CONFIG;
         window.analysis = analysis;
     </script>
@@ -18,7 +18,7 @@
     <div class="container">
         <div class="header">
             <div class="weekly-movement" id="weeklyMovement"></div>
-            <h1 class="main-title" id="mainTitle">Should I Give A Fuck?</h1>
+            <h1 class="main-title" id="mainTitle">Should I Care?</h1>
             <div class="block-info" id="blockInfo" style="display: none"></div>
         </div>
 
@@ -86,7 +86,7 @@
 
         <div class="final-word">
             <div class="final-question">
-                So, should you give a fuck about the price of Bitcoin?
+                So, should you Care about the price of Bitcoin?
             </div>
             <div class="final-answer" id="finalWord">...</div>
         </div>
@@ -96,9 +96,9 @@
                 Each horizon shows the velocity and direction of recent
                 price movement.<br />
                 If the consensus of signals is strongly negative, then you
-                should give a fuck.
+                should Care.
             </div>
-            <a href="/wtfit.html" class="footer-link">Read the full explanation →</a>
+            <a href="wtfit.html" class="footer-link">Read the full explanation →</a>
             <div class="error" id="errorStatus" style="display: none"></div>
         </div>
     </div>
@@ -111,7 +111,7 @@
             calculateNormalizedSegmentAngle,
             calculateStdDev,
             sigCatStdDev
-        } from '/js/analysis.js';
+        } from './js/analysis.js';
 
         // --- Live price fetching with fallback ---
         async function getLiveBitcoinPrice() {

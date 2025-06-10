@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The Geometry of Momentum | Should I Give a Fuck?</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <title>The Geometry of Momentum | Should I Care?</title>
+    <link rel="stylesheet" href="css/styles.css">
     <script type="module">
-        import { CONFIG } from '/js/config.js';
-        import * as analysis from '/js/analysis.js';
+        import { CONFIG } from './js/config.js';
+        import * as analysis from './js/analysis.js';
         window.CONFIG = CONFIG;
         window.analysis = analysis;
     </script>
@@ -82,8 +82,8 @@
         <!-- FOOTER ------------------------------------------------------------->
         <div class="footer">
             <div class="footer-nav">
-                <a href="/index.html">&larr; Back to the Meter</a>
-                <a href="/wtfit.html">Read Full Explanation &rarr;</a>
+                <a href="index.html">&larr; Back to the Meter</a>
+                <a href="wtfit.html">Read Full Explanation &rarr;</a>
             </div>
         </div>
     </div>
@@ -107,16 +107,16 @@
             grid: "#e9ecef",
             text: "#6b7280",
             path: "#374151",
-            ath:  "#adb5bd",
-            macro:"#f59e0b",
-            fit:  "#8b5cf6",
-            "sig-party":    "#059669",
-            "sig-peachy":   "#d97706",
-            "sig-meh":      "#6b7280",
-            "sig-watch":    "#2563eb",
+            ath: "#adb5bd",
+            macro: "#f59e0b",
+            fit: "#8b5cf6",
+            "sig-party": "#059669",
+            "sig-peachy": "#d97706",
+            "sig-meh": "#6b7280",
+            "sig-watch": "#2563eb",
             "sig-no-bueno": "#dc2626",
-            chirp:          "#a855f7",
-            peak:           "#f59e0b",
+            chirp: "#a855f7",
+            peak: "#f59e0b",
         };
 
         // ---------------------------------------------------------------------
@@ -128,15 +128,15 @@
             const { f0, k, peaks, extraCurve } = params;
             const ctx = canvas.getContext("2d");
             const pad = 50;
-            const w   = canvas.width  - 2 * pad;
-            const h   = canvas.height - 2 * pad;
+            const w = canvas.width - 2 * pad;
+            const h = canvas.height - 2 * pad;
 
             // clear
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // grid
             ctx.strokeStyle = chartColors.grid;
-            ctx.lineWidth   = 1;
+            ctx.lineWidth = 1;
             ctx.beginPath();
             for (let i = 0; i <= 4; i++) {
                 const y = pad + (i / 4) * h;
@@ -152,13 +152,13 @@
             ctx.fillText("Normalised time x (0 → 1)", pad + w / 2, canvas.height - 10);
             ctx.save();
             ctx.translate(15, pad + h / 2);
-            ctx.rotate(-Math.PI/2);
+            ctx.rotate(-Math.PI / 2);
             ctx.fillText("sin (2π·phase(x))", 0, 0);
             ctx.restore();
 
             // chirp wave
             ctx.strokeStyle = chartColors.chirp;
-            ctx.lineWidth   = 2;
+            ctx.lineWidth = 2;
             ctx.beginPath();
             for (let i = 0; i <= 400; i++) {
                 const x = i / 400;
@@ -167,14 +167,14 @@
                 const cx = pad + x * w;
                 const cy = pad + y * h;
                 if (i === 0) ctx.moveTo(cx, cy);
-                else         ctx.lineTo(cx, cy);
+                else ctx.lineTo(cx, cy);
             }
             ctx.stroke();
 
             // peaks
             ctx.strokeStyle = chartColors.peak;
-            ctx.lineWidth   = 2;
-            ctx.setLineDash([4,3]);
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
             peaks.forEach((xNorm, idx) => {
                 const cx = pad + xNorm * w;
                 ctx.beginPath();
@@ -185,8 +185,8 @@
                 ctx.setLineDash([]);
                 ctx.fillStyle = chartColors.text;
                 ctx.textAlign = "center";
-                ctx.fillText(idx+1, cx, pad + h + 15);
-                ctx.setLineDash([4,3]);
+                ctx.fillText(idx + 1, cx, pad + h + 15);
+                ctx.setLineDash([4, 3]);
             });
             ctx.setLineDash([]);
 
@@ -194,7 +194,7 @@
             ctx.fillStyle = chartColors.text;
             ctx.textAlign = "left";
             ctx.fillText(`f₀ = ${f0.toFixed(2)} cycles,  k = ${k.toFixed(2)},  Δcurvature = ${extraCurve.toFixed(4)}`,
-                         pad, pad - 15);
+                pad, pad - 15);
         }
 
         // ---------------------------------------------------------------------
@@ -208,20 +208,20 @@
             //  - curvature, macroActualSlope, latestBlock, etc. to outer scope vars
             //  - and draws macro & micro charts
             let curvature, macroActualSlope, latestBlock, allTimeHigh;
-            await (async function() {
+            await (async function () {
                 // full analysis copied from earlier (omitted here to save space)
                 // at the end we set the needed vars:
-                curvature          = /* value from quadratic fit */;
-                macroActualSlope   = /* latestPrice / allTimeHigh */;
-                latestBlock        = /* latest block height */;
-                allTimeHigh        = /* ATH price */;
+                curvature = /* value from quadratic fit */;
+                macroActualSlope = /* latestPrice / allTimeHigh */;
+                latestBlock = /* latest block height */;
+                allTimeHigh = /* ATH price */;
             })();
 
             // CHIRP slider & draw ---------------------------------------------
             const chirpCanvas = document.getElementById("chirpChart");
-            const slider      = document.getElementById("curvatureSlider");
-            const sliderLbl   = document.getElementById("curvatureValue");
-            const size        = chirpCanvas.parentElement.getBoundingClientRect().width;
+            const slider = document.getElementById("curvatureSlider");
+            const sliderLbl = document.getElementById("curvatureValue");
+            const size = chirpCanvas.parentElement.getBoundingClientRect().width;
             chirpCanvas.width = chirpCanvas.height = size;
             chirpCanvas.style.display = "block";
 
@@ -240,18 +240,18 @@
                 const effCurv = curvature + extra;
 
                 // replicate α calc (normalised curvature + slope blend)
-                const curvInput  = normalizeMetric(effCurv, curvatureStats, curvatureSensitivity);
-                const slopeInput = normalizeMetric(macroActualSlope, slopeStats,  slopeSensitivity);
-                const blend      = curvInput * (1 - slopeWeight) + slopeInput * slopeWeight;
-                const alpha      = (blend + 1) / 2;
+                const curvInput = normalizeMetric(effCurv, curvatureStats, curvatureSensitivity);
+                const slopeInput = normalizeMetric(macroActualSlope, slopeStats, slopeSensitivity);
+                const blend = curvInput * (1 - slopeWeight) + slopeInput * slopeWeight;
+                const alpha = (blend + 1) / 2;
 
                 const startCycles = flatteningLookbackConfig.startCycles * (1 - alpha) +
-                                    steepeningLookbackConfig.startCycles * alpha;
-                const endCycles   = flatteningLookbackConfig.endCycles   * (1 - alpha) +
-                                    steepeningLookbackConfig.endCycles   * alpha;
+                    steepeningLookbackConfig.startCycles * alpha;
+                const endCycles = flatteningLookbackConfig.endCycles * (1 - alpha) +
+                    steepeningLookbackConfig.endCycles * alpha;
 
                 const f0 = startCycles;
-                const k  = endCycles - startCycles;
+                const k = endCycles - startCycles;
 
                 // use generateLookbacks to get the peaks → convert to x positions
                 const lookbacks = generateLookbacksAlongMacroActual(
@@ -260,13 +260,13 @@
                     CONFIG.GEO_MODEL_CONFIG,
                     macroActualSlope
                 );
-                const maxRange  = latestBlock * lookbackRangeDenominator;
+                const maxRange = latestBlock * lookbackRangeDenominator;
                 const peaks = lookbacks.map(L => L / maxRange);
 
                 return { f0, k, peaks, extraCurve: extra };
             };
 
-            const renderChirp = (delta=0) => {
+            const renderChirp = (delta = 0) => {
                 sliderLbl.textContent = Number(delta).toFixed(4);
                 const params = computeChirpParams(Number(delta));
                 drawChirpChart(chirpCanvas, params);
