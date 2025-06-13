@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>What The Fuxk Is This? | Should I Care?</title>
+    <title>What The F*ck Is This? | Should I Care?</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 
 <body>
     <div class="container">
         <div class="header">
-            <h1 class="main-title">What The Fuxk Am I Looking At?</h1>
+            <h1 class="main-title">What The F*ck Am I Looking At?</h1>
         </div>
 
         <div class="content">
@@ -20,15 +20,15 @@
                 The Bitcoin protocol doesn't care about tweets, regulations,
                 or media hype. Its forward march is relentless. The USD
                 price is just a noisy, human interpretation of this
-                progress. There are other metrics that would be great to use like 
-                the difficulty adjustments for eg, but, at the end of the day, 
+                progress. There are other metrics that would be great to use like
+                the difficulty adjustments for eg, but, at the end of the day,
                 people care about price.
             </p>
             <p>
                 My beef is that standard charts are filled with patterns that
                 demand interpretation, a process that is often subjective
-                and error-prone. As a data guy, I look at a lot of charts 
-                and have come to realise you can bin 99% of them, you're probably 
+                and error-prone. As a data guy, I look at a lot of charts
+                and have come to realise you can bin 99% of them, you're probably
                 not helping yourself by trying to interpret them.
             </p>
             <div class="callout">
@@ -60,157 +60,147 @@
                 </li>
                 <li>
                     <strong>The Macro Trend Angle:</strong> We calculate the angle formed by a straight line from the
-                    origin - defined as the first price at the first block ($0,block-1) to the current price and block.
+                    origin to the current price and block.
                     Our baseline (best-case scenario) is a 45º diagonal line from the origin that passes through the
-                    all-time high (ATH).
-                    The difference between this ideal line and the actual line to the current price represents the
-                    deviation from Bitcoin’s macro trend a geometric measure of long-term momentum.
-
-                    For example, if the ATH is $100,000 and the current price is $90,000, the trend angle drops from 45º
-                    to about 42º a 3º decrease.
-                    Doesn’t sound like much? That’s because Bitcoin has historically had extremely strong momentum. Even
-                    a 50% drop in price results in an 18º shift.
-
-                    This is a particularly meaningful metric for Bitcoin, because unlike businesses Bitcoin’s
-                    fundamentals haven’t changed:
-                    No leadership turnover, no new product risks, no obsolescence curve. The protocol keeps running,
-                    blocks keep ticking, and price is the primary signal. The Macro Trend Angle captures how faithfully
-                    price is tracking that signal over time.
+                    all-time high (ATH). The deviation of our current trend angle from this 45º ideal is a key input
+                    that tells the model about the health of the overall macro trend.
                 </li>
                 <li>
                     <strong>The Micro Trend Horizons:</strong>
-                    We can’t be naïve, short-term movement matters, especially with Bitcoin’s historic volatility.
-                    For a micro-level perspective, we look *backward* along the Macro Trend Line toward dynamically
-                    chosen points we call “horizons.”
-
-                    We use the word “horizons” because we’re still operating within the full scope of historical data -
-                    not a limited rolling time window.
-                    Unlike a timeframe, which only considers data within a fixed period, horizons reference specific
-                    past points **along the macro trend line** itself.
-                    This keeps the macro context intact while giving us high-resolution insight into recent market
-                    behavior.
+                    To measure momentum changes, we look backward from the current price to dynamically chosen points we
+                    call "horizons." Unlike a fixed timeframe (e.g., "90 days"), these horizons are adaptively generated
+                    based on the market's current character, ensuring we are always asking the most relevant questions.
                 </li>
             </ol>
 
-            <h2>The Micro Measurement</h2>
-                <p>
-                    The final verdict is a pure, unweighted consensus derived
-                    from comparing the micro to the macro.
-                </p>
-                <h3>1. Deriving Adaptive Horizons</h3>
-                <p>
-                    The five analysis horizons are derived using a method
-                    inspired by signal processing to adapt to market conditions:
-                </p>
+            <h2>The Micro Measurement: A "Momentum of Momentum" Analysis</h2>
+            <p>
+                The final verdict is a weighted consensus that measures the market's acceleration or deceleration across
+                different timeframes.
+            </p>
+            <h3>1. Deriving Adaptive Horizons</h3>
+            <p>
+                The analysis horizons are not fixed; they are generated using a method inspired by signal processing to
+                adapt to market conditions:
+            </p>
+            <ul>
+                <li>
+                    To identify the key “horizons” to measure price behavior, the model uses a "chirp" signal. The peaks
+                    of this wave give us non-linear points in Bitcoin’s history to look back on.
+                </li>
+                <li>
+                    The shape of that chirp is calibrated by blending two macro signals: the **Quadratic Curvature** (is
+                    the trend accelerating?) and the **Macro Angular Ratio** (is the trend healthy?).
+                </li>
+                <li>
+                    If the macro trend is strong and decisive, the peaks are further apart, causing the model to sample
+                    a **broad range of the past** (e.g., 3 weeks to 6 months) to understand the context of the large
+                    move. If macro momentum is slowing, the peaks cluster toward the present, giving us a **tighter
+                    lens** on recent volatility (e.g., 10 days to 80 days). This makes the model adapt to the market’s
+                    tempo, not a rigid clock.
+                </li>
+            </ul>
+
+            <h3>2. Calculating Corrected Momentum Deviation</h3>
+            <p>
+                This is the core of the analysis. Instead of just comparing a micro trend to the overall macro trend, we
+                compare each timeframe's momentum to the next longest one in a sequential chain. This measures the *rate
+                of change* of momentum.
+            </p>
+            <p>
+                Crucially, this comparison is **corrected for the natural geometric distortion** that occurs when you
+                "zoom in" on a trend line.
+            </p>
+            <pre><code>// Simplified Concept
+Expected_Angle_S = Actual_Angle_L * (Lookback_S / Lookback_L)
+Deviation = Actual_Angle_S - Expected_Angle_S</code></pre>
+
+            <p>
+                This process isolates the *true* acceleration or deceleration, giving a pure signal of whether momentum
+                is building or fading relative to the established trend of the prior period. The status for each horizon
+                (Peachy, No Bueno, etc.) is then assigned based on how significant this deviation is relative to the
+                others.
+            </p>
+
+            <div class="status-definitions">
                 <ul>
-                    <li>
-                        To identify the key “horizons” to measure short-term price behavior, 
-                        I use a modulated sine wave - what signal processors call a chirp. 
-                        The peaks of this wave give us points in Bitcoin’s history to look back on.
-                        The shape of that chirp is calibrated to Bitcoin’s current macro momentum.
-                    </li>
-                    </li> 
-                        If the macro trend is strong and steep, the peaks are further apart,
-                        I sample a broad range of the past. If momentum is slowing, the peaks cluster 
-                        toward the present, giving us a tighter lens on recent volatility.
-                        This avoids rigid timeframes and makes the model adapt to the market’s tempo, not mine.
-                    </li>
+                    <li><span class="sig-label sig-party">PARTY</span>: Strong, unexpected positive acceleration ($Δ >
+                        1.5σ$).</li>
+                    <li><span class="sig-label sig-peachy">PEACHY</span>: Mild positive acceleration ($0.5σ < Δ \le
+                            1.5σ$).</li>
+                    <li><span class="sig-label sig-meh">MEH</span>: Momentum is behaving as expected ($-0.5σ \le Δ \le
+                        0.5σ$).</li>
+                    <li><span class="sig-label sig-watch">WATCH</span>: Mild negative acceleration (deceleration)
+                        ($-1.5σ \le Δ < -0.5σ$).</li>
+                    <li><span class="sig-label sig-no-bueno">NO BUENO</span>: Strong deceleration or trend breakdown ($Δ
+                        < -1.5σ$).</li>
                 </ul>
+            </div>
 
-                <h3>2. Calculating Deviation & Status</h3>
-                <p>
-                    For each horizon, its momentum angle ($θ_{micro}$) is
-                    compared against the benchmark ($θ_{macro}$). The difference
-                    is its deviation ($Δ$).
-                </p>
-                <pre><code>Δ = θ_micro - θ_macro</code></pre>
+            <h3>3. Reaching a Weighted Consensus</h3>
+            <p>
+                Each horizon casts a "vote" based on its status. However, these votes are not all equal. The consensus
+                is **weighted to give more influence to longer-term signals**. This reflects a core philosophy: in a
+                strong trend, the established, longer-term momentum is a more reliable signal than short-term, noisy
+                volatility. This prevents a single bad day from overriding months of positive momentum, leading to a
+                more robust and stable final verdict.
+            </p>
 
-                <p>
-                    The status is assigned based on how many standard deviations ($σ$) its delta is from the average of
-                    all five current deltas. This makes the signals inherently adaptive to recent volatility.
-                </p>
+            <h2>Visualizing The Geometry</h2>
+            <p>
+                While this tool avoids charts for its final analysis,
+                visualizing the underlying geometry can help overcome my poor explanations.
+                The chart page demonstrates a core problem with subjective
+                analysis: perspective changes everything.
+            </p>
+            <p>
+                You will see the macro trend line, which looks steep from a
+                distance, appear nearly flat when you zoom in on the present
+                moment. This distortion is precisely why this meter was
+                built—to replace subjective interpretation with objective
+                calculation.
+            </p>
 
-                <div class="status-definitions">
-                    <ul>
-                        <li><span class="sig-label sig-party">PARTY</span>: Indicates strong positive momentum, when the
-                            deviation is more than 1.5 standard deviations above the average ($Δ > 1.5σ$).</li>
-                        <li><span class="sig-label sig-peachy">PEACHY</span>: Indicates mild positive momentum, for
-                            deviations between 0.5 and 1.5 standard deviations ($0.5σ < Δ \le 1.5σ$).</li>
-                        <li><span class="sig-label sig-meh">MEH</span>: Indicates neutral momentum, with a deviation
-                            within half a standard deviation of the average ($-0.5σ \le Δ \le 0.5σ$).</li>
-                        <li><span class="sig-label sig-watch">WATCH</span>: Indicates mild negative momentum, for
-                            deviations between -0.5 and -1.5 standard deviations ($-1.5σ \le Δ < -0.5σ$).</li>
-                        <li><span class="sig-label sig-no-bueno">NO BUENO</span>: Indicates strong negative momentum,
-                            when the deviation is more than 1.5 standard deviations below the average ($Δ <
-                                -1.5σ$).</li>
-                    </ul>
-                </div>
+            <div class="link-container">
+                <a href="chart.html" class="link-card">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                        <path
+                            d="M1 11a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1zm5-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm5-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1z" />
+                    </svg>
+                    <div>
+                        <span class="link-title">View The Charts</span>
+                        <span class="link-subtitle">Visualize the macro and micro geometry</span>
+                    </div>
+                </a>
+            </div>
 
-                <h3>3. Reaching an Unweighted Consensus</h3>
-                <p>
-                    Each horizon casts a "vote" from +2 to -2 based on its
-                    status. These votes are simply summed up. There is no
-                    complex weighting. This raw consensus determines the final
-                    "Yep..," "No.," or "Yeah Nah" verdict - a robust and
-                    straightforward assessment of whether the current momentum
-                    warrants your attention.
-                </p>
-
-                <h2>Visualizing The Geometry</h2>
-                <p>
-                    While this tool avoids charts for its final analysis,
-                    visualizing the underlying geometry can be help overcome my poor explainations. 
-                    The chart page demonstrates a core problem with subjective
-                    analysis: perspective changes everything.
-                </p>
-                <p>
-                    You will see the macro trend line, which looks steep from a
-                    distance, appear nearly flat when you zoom in on the present
-                    moment. This distortion is precisely why this meter was
-                    built-to replace subjective interpretation with objective
-                    calculation.
-                </p>
-
-                <div class="link-container">
-                    <a href="chart.html" class="link-card">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
-                            <path
-                                d="M1 11a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1zm5-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zm5-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1z" />
-                        </svg>
-                        <div>
-                            <span class="link-title">View The Charts</span>
-                            <span class="link-subtitle">Visualize the macro and micro geometry</span>
-                        </div>
-                    </a>
-                </div>
-
-                <h2>About & Contact</h2>
-                <div class="link-container">
-                    <a href="https://github.com/bfgdigital/sigaf" class="link-card" target="_blank"
-                        rel="noopener noreferrer">
-                        <svg viewBox="0 0 16 16" version="1.1" aria-hidden="true" fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
-                            </path>
-                        </svg>
-                        <div>
-                            <span class="link-title">View on GitHub</span>
-                            <span class="link-subtitle">See the open-source code</span>
-                        </div>
-                    </a>
-                    <a href="https://primal.net/p/npub14c9x62qzjgfturmxp4lzwx52ph7nkzefjrkjr566wsnjmgkj2fpssfs5jx"
-                        class="link-card" target="_blank" rel="noopener noreferrer">
-                        <svg viewBox="0 0 1024 1024" version="1.1" aria-hidden="true" fill="currentColor">
-                            <path
-                                d="M512 0C229.227 0 0 229.227 0 512s229.227 512 512 512 512-229.227 512-512S794.773 0 512 0z m0 85.333c235.627 0 426.667 191.040 426.667 426.667S747.627 938.667 512 938.667 85.333 747.627 85.333 512 276.373 85.333 512 85.333z m-128 128c-100.267 0-181.333 81.067-181.333 181.333s81.067 181.333 181.333 181.333 181.333-81.067 181.333-181.333-81.067-181.333-181.333-181.333z m0 85.334c52.907 0 96 43.093 96 96s-43.093 96-96 96-96-43.093-96-96 43.093-96 96-96z m256 128c-15.147 0-27.307 12.16-27.307 27.307v218.453c0 15.147 12.16 27.307 27.307 27.307s27.307-12.16 27.307-27.307V368.64c0-15.147-12.16-27.307-27.307-27.307z m-256 256c-100.267 0-181.333 81.067-181.333 181.333s81.067 181.333 181.333 181.333 181.333-81.067 181.333-181.333-81.067-181.333-181.333-181.333z m0 85.333c52.907 0 96 43.093 96 96s-43.093 96-96 96-96-43.093-96-96 43.093-96 96-96z">
-                            </path>
-                        </svg>
-                        <div>
-                            <span class="link-title">Find me on Nostr</span>
-                            <span class="link-subtitle">Feedback and questions welcome</span>
-                        </div>
-                    </a>
-                </div>
+            <h2>About & Contact</h2>
+            <div class="link-container">
+                <a href="https://github.com/bfgdigital/sigaf" class="link-card" target="_blank"
+                    rel="noopener noreferrer">
+                    <svg viewBox="0 0 16 16" version="1.1" aria-hidden="true" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
+                        </path>
+                    </svg>
+                    <div>
+                        <span class="link-title">View on GitHub</span>
+                        <span class="link-subtitle">See the open-source code</span>
+                    </div>
+                </a>
+                <a href="https://primal.net/p/npub14c9x62qzjgfturmxp4lzwx52ph7nkzefjrkjr566wsnjmgkj2fpssfs5jx"
+                    class="link-card" target="_blank" rel="noopener noreferrer">
+                    <svg viewBox="0 0 1024 1024" version="1.1" aria-hidden="true" fill="currentColor">
+                        <path
+                            d="M512 0C229.227 0 0 229.227 0 512s229.227 512 512 512 512-229.227 512-512S794.773 0 512 0z m0 85.333c235.627 0 426.667 191.040 426.667 426.667S747.627 938.667 512 938.667 85.333 747.627 85.333 512 276.373 85.333 512 85.333z m-128 128c-100.267 0-181.333 81.067-181.333 181.333s81.067 181.333 181.333 181.333 181.333-81.067 181.333-181.333-81.067-181.333-181.333-181.333z m0 85.334c52.907 0 96 43.093 96 96s-43.093 96-96 96-96-43.093-96-96 43.093-96 96-96z m256 128c-15.147 0-27.307 12.16-27.307 27.307v218.453c0 15.147 12.16 27.307 27.307 27.307s27.307-12.16 27.307-27.307V368.64c0-15.147-12.16-27.307-27.307-27.307z m-256 256c-100.267 0-181.333 81.067-181.333 181.333s81.067 181.333 181.333 181.333 181.333-81.067 181.333-181.333-81.067-181.333-181.333-181.333z m0 85.333c52.907 0 96 43.093 96 96s-43.093 96-96 96-96-43.093-96-96 43.093-96 96-96z">
+                        </path>
+                    </svg>
+                    <div>
+                        <span class="link-title">Find me on Nostr</span>
+                        <span class="link-subtitle">Feedback and questions welcome</span>
+                    </div>
+                </a>
+            </div>
         </div>
 
         <div class="footer">

@@ -41,7 +41,8 @@
             <canvas id="macroChart" style="display: none"></canvas>
         </div>
         <div class="explanation">
-            <p>This chart shows Bitcoin's entire history normalized into a 1x1 square. This allows us to compare all price action on a
+            <p>This chart shows Bitcoin's entire history normalized into a 1x1 square. This allows us to compare all
+                price action on a
                 level playing field.</p>
             <ul>
                 <li>
@@ -87,24 +88,35 @@
             <canvas id="microChart" style="display: none"></canvas>
         </div>
         <div class="explanation">
-            <p>Here, we zoom in on the most recent price action. This view demonstrates two key concepts: why human chart analysis is flawed and how the meter avoids it.</p>
+            <p>Here, we zoom in on the most recent price action. This view demonstrates two key concepts: why human
+                chart analysis is flawed and how the meter avoids it.</p>
             <ul>
                 <li>
                     <div class="legend-swatch" style="background: #f59e0b"></div>
                     <div>
-                        <strong>Perspective is an Illusion:</strong> Notice how the orange <strong>Macro Trend Line</strong>, which looked steep in the macro view, now appears almost flat. Your perception of its steepness is an illusion created by the zoom level. The meter avoids this by using raw angles, not visual interpretation.
+                        <strong>Perspective is an Illusion:</strong> Notice how the orange <strong>Macro Trend
+                            Line</strong>, which looked steep in the macro view, now appears almost flat. Your
+                        perception of its steepness is an illusion created by the zoom level. The meter avoids this by
+                        using raw angles, not visual interpretation.
                     </div>
                 </li>
                 <li>
                     <div class="legend-swatch" style="background: #059669"></div>
                     <div>
-                        <strong>Dynamic Horizons:</strong> The five colored <strong>Micro Horizon Lines</strong> represent momentum over different timeframes. Crucially, these are not fixed periods (like 30 or 90 days). They are dynamically selected using a mathematical signal.
+                        <strong>Annotated Deviations (Δ):</strong> Each colored horizon line now has an annotation
+                        showing its final calculated momentum deviation. This value represents the *true* acceleration
+                        or deceleration of that timeframe relative to the next longest one. This is the exact value used
+                        to generate the "Peachy" or "No Bueno" status on the main meter.
                     </div>
                 </li>
-                 <li>
-                    <div class="legend-swatch" style="background-color: #059669; border-radius: 50%; width: 20px; height: 20px; color: white; text-align: center; font-weight: bold; line-height: 20px;">①</div>
+                <li>
+                    <div class="legend-swatch"
+                        style="background-color: #059669; border-radius: 50%; width: 20px; height: 20px; color: white; text-align: center; font-weight: bold; line-height: 20px;">
+                        ①</div>
                     <div>
-                        <strong>Chirp-Selected Lookbacks:</strong> The starting point of each horizon is connected to a color-coded marker on the x-axis. These points are derived from the peaks of a "chirp" signal whose frequency changes based on the market's long-term acceleration (the curvature of the purple line in the macro chart).
+                        <strong>Chirp-Selected Lookbacks:</strong> The starting point of each horizon is connected to a
+                        color-coded marker on the x-axis. These points are derived from the peaks of a "chirp" signal
+                        whose frequency changes based on the market's long-term acceleration and trend health.
                     </div>
                 </li>
             </ul>
@@ -117,20 +129,20 @@
             </div>
         </div>
     </div>
-    
+
     <script type="module">
         import {
             parseCsvLines,
             calculateQuadraticFit,
-            generateLookbacksAlongMacroActual,
+            generateLookbacks,
             calculateNormalizedSegmentAngle,
             calculateStdDev,
             sigCatStdDev,
         } from './js/analysis.js';
 
-        
-        // COLOURS
-        
+
+        // --- STYLING & DRAWING (No changes needed here) ---
+
         const chartColors = {
             grid: "#e9ecef", text: "#6b7280", path: "#374151",
             ath: "#adb5bd", macro: "#f59e0b", fit: "#8b5cf6",
@@ -139,17 +151,15 @@
             "sig-no-bueno": "#dc2626",
         };
 
-        
-        // DRAWING HELPERS
-        
         function drawMacroChart(canvas, chartData) {
+            // This function is correct, no changes needed.
             const ctx = canvas.getContext("2d");
             const padding = 60;
-            const { normalizedHistorical, fit, currentAngle } = chartData;
+            const { normalizedHistorical, fit, currentAngle, athBlock } = chartData;
             const chartWidth = canvas.width - 2 * padding;
             const chartHeight = canvas.height - 2 * padding;
             const mapCoords = (x, y) => ({ x: padding + x * chartWidth, y: canvas.height - padding - y * chartHeight });
-            
+
             const latestPoint = normalizedHistorical[normalizedHistorical.length - 1];
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -158,7 +168,6 @@
             ctx.font = "12px sans-serif";
             ctx.lineWidth = 1;
 
-            // Draw Grid and Labels
             for (let i = 0; i <= 4; i++) {
                 const frac = i / 4;
                 let p = mapCoords(0, frac);
@@ -176,14 +185,12 @@
             ctx.translate(15, canvas.height / 2); ctx.rotate(-Math.PI / 2);
             ctx.fillText("Price as % of All-Time High", 0, 0);
             ctx.restore();
-            
-            // Draw ATH Benchmark Line
+
             ctx.strokeStyle = chartColors.ath; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
             let p1 = mapCoords(0, 0), p2 = mapCoords(1, 1);
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
             ctx.setLineDash([]);
 
-            // Draw Quadratic Fit
             ctx.strokeStyle = chartColors.fit; ctx.lineWidth = 2.5;
             ctx.beginPath();
             let p = mapCoords(0, fit.c);
@@ -195,7 +202,6 @@
             }
             ctx.stroke();
 
-            // Draw Historical Path
             ctx.strokeStyle = chartColors.path; ctx.lineWidth = 1.5;
             ctx.beginPath();
             p1 = mapCoords(normalizedHistorical[0].x, normalizedHistorical[0].y);
@@ -205,11 +211,9 @@
             }
             ctx.stroke();
 
-            //  REVISED: Annotations for the Macro Trend Line 
             const origin = mapCoords(0, 0);
             const endOfTrend = mapCoords(latestPoint.x, latestPoint.y);
 
-            // 1. Draw the main macro trend line
             ctx.strokeStyle = chartColors.macro;
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -217,17 +221,15 @@
             ctx.lineTo(endOfTrend.x, endOfTrend.y);
             ctx.stroke();
 
-            // 2. Draw the angle arc
             const angleRad = currentAngle * (Math.PI / 180);
             const arcRadius = chartWidth * 0.20;
             ctx.beginPath();
-            ctx.arc(origin.x, origin.y, arcRadius, 0, -angleRad, true); // true for counter-clockwise
+            ctx.arc(origin.x, origin.y, arcRadius, 0, -angleRad, true);
             ctx.setLineDash([2, 4]);
             ctx.lineWidth = 1.5;
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // 3. Draw the angle label
             const labelAngle = -angleRad / 2;
             const labelRadius = arcRadius + 15;
             ctx.fillStyle = chartColors.text;
@@ -239,42 +241,26 @@
                 origin.x + labelRadius * Math.cos(labelAngle),
                 origin.y + labelRadius * Math.sin(labelAngle)
             );
-
-            // 4. Show the intercept on the 45-degree baseline
-            const interceptPointNorm = { x: latestPoint.x, y: latestPoint.x };
-            const interceptPointCanvas = mapCoords(interceptPointNorm.x, interceptPointNorm.y);
-            
-            ctx.beginPath();
-            ctx.arc(interceptPointCanvas.x, interceptPointCanvas.y, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = chartColors.ath;
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.moveTo(interceptPointCanvas.x, interceptPointCanvas.y);
-            ctx.lineTo(endOfTrend.x, endOfTrend.y);
-            ctx.strokeStyle = chartColors.text;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([3, 4]);
-            ctx.stroke();
-            ctx.setLineDash([]);
         }
 
         function drawMicroChart(canvas, chartData) {
             const ctx = canvas.getContext("2d");
             const padding = { top: 60, right: 60, bottom: 60, left: 80 };
-            const { normalizedHistorical, analysisResults, latestBlock, allTimeHigh, historical } = chartData;
-            
-            const longestLookback = Math.max(...analysisResults.map((r) => r.lookback));
+            // Destructure latestBlock, which we now pass in
+            const { normalizedHistorical, historical, momentumDeltas, athBlock, allTimeHigh, latestBlock } = chartData;
+
+            const longestLookback = Math.max(...momentumDeltas.map((r) => r.lookback));
             const zoomWindowBlocks = longestLookback * 1.15;
-            const xMinNorm = (latestBlock - zoomWindowBlocks) / latestBlock;
+            // Use latestBlock for zooming window calculation for better relevance
+            const xMinNorm = (latestBlock - zoomWindowBlocks) / athBlock; 
             const relevantHistory = normalizedHistorical.filter((p) => p.x >= xMinNorm);
-            if (relevantHistory.length === 0) return; // Exit if no data in view
-            
+            if (relevantHistory.length === 0) return;
+
             const yMinNorm = Math.min(...relevantHistory.map((p) => p.y)) * 0.98;
             const yMaxNorm = Math.max(...relevantHistory.map((p) => p.y)) * 1.02;
             const chartWidth = canvas.width - padding.left - padding.right;
             const chartHeight = canvas.height - padding.top - padding.bottom;
-            
+
             const mapCoords = (xNorm, yNorm) => {
                 const zoomedX = (xNorm - xMinNorm) / (1 - xMinNorm);
                 const zoomedY = (yNorm - yMinNorm) / (yMaxNorm - yMinNorm);
@@ -282,10 +268,10 @@
             };
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // ... (rest of the grid/axis drawing is fine) ...
             ctx.font = "12px sans-serif";
             ctx.strokeStyle = chartColors.grid; ctx.fillStyle = chartColors.text; ctx.lineWidth = 1;
-            
-            // Draw Grid and Labels
+
             const boxStart = mapCoords(xMinNorm, yMinNorm);
             const boxEnd = mapCoords(1, yMaxNorm);
             ctx.strokeRect(boxStart.x, boxEnd.y, boxEnd.x - boxStart.x, boxStart.y - boxEnd.y);
@@ -299,10 +285,10 @@
             for (let i = 0; i <= 4; i++) {
                 const xNorm = xMinNorm + (i * (1 - xMinNorm)) / 4;
                 const p = mapCoords(xNorm, yMinNorm);
-                ctx.fillText(`${(xNorm * latestBlock).toLocaleString(undefined, { maximumFractionDigits: 0,})}`, p.x, p.y + 20);
+                ctx.fillText(`${(xNorm * athBlock).toLocaleString(undefined, { maximumFractionDigits: 0, })}`, p.x, p.y + 20);
             }
-            
-            // Draw Historical Path
+
+
             ctx.strokeStyle = chartColors.path; ctx.lineWidth = 2;
             ctx.beginPath();
             let firstPoint = true;
@@ -315,137 +301,157 @@
             }
             ctx.stroke();
 
-            // Draw Macro Trend Line
-            const latestPoint = normalizedHistorical[normalizedHistorical.length - 1];
-            const macroSlope = latestPoint.y / latestPoint.x;
+            const latestPointNorm = normalizedHistorical[normalizedHistorical.length - 1];
+            const macroSlope = latestPointNorm.y / latestPointNorm.x;
             const macroYatXmin = macroSlope * xMinNorm;
             let p1 = mapCoords(xMinNorm, macroYatXmin);
-            let p2 = mapCoords(latestPoint.x, latestPoint.y);
+            let p2 = mapCoords(latestPointNorm.x, latestPointNorm.y);
             ctx.strokeStyle = chartColors.macro; ctx.lineWidth = 3;
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
-            
-            //  Loop to draw horizons and their annotations 
-            analysisResults.forEach((horizon, index) => {
+
+            momentumDeltas.sort((a, b) => b.lookback - a.lookback);
+
+            momentumDeltas.forEach((horizon, index) => {
+                // ==========================================================
+                // ========= THE CRITICAL BUG FIX IS HERE ===================
+                // ==========================================================
+                // We must use 'latestBlock' as the reference, not 'athBlock',
+                // to match how the angle was originally calculated.
                 const startBlock = latestBlock - horizon.lookback;
+                // ==========================================================
+
                 const startRow = historical.slice().reverse().find((d) => d.block <= startBlock) || historical[0];
-                const startPointNorm = { x: startRow.block / latestBlock, y: startRow.price / allTimeHigh };
-                
+                const startPointNorm = { x: startRow.block / athBlock, y: startRow.price / allTimeHigh };
+
                 p1 = mapCoords(startPointNorm.x, startPointNorm.y);
-                p2 = mapCoords(latestPoint.x, latestPoint.y);
+                p2 = mapCoords(latestPointNorm.x, latestPointNorm.y);
                 const horizonColor = chartColors[horizon.status.cls];
 
-                // Draw main colored horizon line
                 ctx.strokeStyle = horizonColor;
                 ctx.lineWidth = 2.5;
-                ctx.beginPath();
-                ctx.moveTo(p1.x, p1.y);
-                ctx.lineTo(p2.x, p2.y);
-                ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
 
-                // Draw the new annotations if the start point is visible
                 if (startPointNorm.x >= xMinNorm) {
                     const xAxisPoint = mapCoords(startPointNorm.x, yMinNorm);
 
-                    ctx.beginPath();
-                    ctx.moveTo(p1.x, p1.y);
-                    ctx.lineTo(xAxisPoint.x, xAxisPoint.y);
-                    ctx.strokeStyle = horizonColor;
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([2, 3]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
+                    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(xAxisPoint.x, xAxisPoint.y);
+                    ctx.strokeStyle = horizonColor; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]);
 
-                    ctx.beginPath();
-                    ctx.arc(xAxisPoint.x, xAxisPoint.y, 10, 0, 2 * Math.PI);
-                    ctx.fillStyle = horizonColor;
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(xAxisPoint.x, xAxisPoint.y, 10, 0, 2 * Math.PI);
+                    ctx.fillStyle = horizonColor; ctx.fill();
 
-                    ctx.fillStyle = "#FFFFFF";
-                    ctx.font = "bold 12px sans-serif";
-                    ctx.textAlign = "center";
+                    ctx.fillStyle = "#FFFFFF"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
                     ctx.textBaseline = "middle";
                     ctx.fillText(String.fromCharCode(0x2460 + index), xAxisPoint.x, xAxisPoint.y);
+
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    ctx.fillStyle = horizonColor;
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.save();
+                    ctx.translate(midX, midY);
+                    const lineAngleRad = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                    ctx.rotate(lineAngleRad);
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "bottom";
+                    ctx.fillText(`Δ = ${horizon.deviation.toFixed(1)}°`, 0, -8);
+                    ctx.restore();
                 }
             });
         }
 
-        
-        // MAIN
-        
+
+        // --- MAIN LOGIC (Correction in analysisData object) ---
+
         document.addEventListener("DOMContentLoaded", () => {
             const runAll = async () => {
-                const loader = document.getElementById("loader");
                 try {
+                    // ... (initial data loading is fine) ...
+                    const loader = document.getElementById("loader");
                     loader.style.display = "block";
                     loader.textContent = "Loading Chart Data...";
-                    
+
                     const bhResp = await fetch("https://blockstream.info/api/blocks/tip/height");
                     const blockHeight = bhResp.ok ? parseInt(await bhResp.text()) : 0;
                     const csvResp = await fetch(`${window.CONFIG.CSV_URL}?v=${new Date().getTime()}`);
                     if (!csvResp.ok) throw new Error(`Could not load CSV: ${csvResp.statusText}`);
                     const csvText = await csvResp.text();
                     const lines = csvText.split("\n").slice(1).filter((line) => line.trim());
+
                     const lastLine = lines[0];
                     const lastCells = lastLine.split(",");
-                    let lastTimestamp;
-                    if (lastCells[0].includes("-") && lastCells[0].length === 10)
-                        lastTimestamp = new Date(lastCells[0] + "T00:00:00Z").getTime();
-                    else
-                        lastTimestamp = new Date(Number(lastCells[0])).getTime();
-                    const daysSinceGenesis = (new Date().getTime() - window.CONFIG.GENESIS_DATE.getTime()) / (1000 * 60 * 60 * 24);
+                    const lastTimestamp = lastCells[0].includes("-") && lastCells[0].length === 10
+                        ? new Date(lastCells[0] + "T00:00:00Z").getTime()
+                        : new Date(Number(lastCells[0])).getTime();
+                    const daysSinceGenesis = (Date.now() - window.CONFIG.GENESIS_DATE.getTime()) / 86_400_000;
                     const trueBlocksPerDay = blockHeight > 0 ? blockHeight / daysSinceGenesis : 144;
-                    const lastDataBlockHeight = blockHeight - (new Date().getTime() - lastTimestamp) * (trueBlocksPerDay / (24 * 60 * 60 * 1000));
+                    const lastDataBlockHeight = blockHeight - (Date.now() - lastTimestamp) * (trueBlocksPerDay / 86_400_000);
                     const calibratedBlockTimeMs = (lastTimestamp - window.CONFIG.GENESIS_DATE.getTime()) / lastDataBlockHeight;
+
                     const historical = parseCsvLines(lines, calibratedBlockTimeMs).sort((a, b) => a.block - b.block);
+
+                    if (historical.length < 2) throw new Error("Not enough historical data.");
+
                     const allTimeHigh = Math.max(...historical.map((d) => d.price));
                     const latestBlock = historical[historical.length - 1].block;
                     const latestPrice = historical[historical.length - 1].price;
-                    const normalizedHistorical = historical.map((d) => ({ x: d.block / latestBlock, y: d.price / allTimeHigh }));
-                    const fit = calculateQuadraticFit(normalizedHistorical);
-                    const curvature = fit.a;
-                    const macroActualSlope = latestPrice / allTimeHigh;
-                    const lookbackPeriods = generateLookbacksAlongMacroActual(latestBlock, curvature, window.CONFIG.GEO_MODEL_CONFIG, macroActualSlope);
-                    const currentAngle = calculateNormalizedSegmentAngle(0, 0, latestBlock, latestPrice, latestBlock, allTimeHigh);
-                    const analysisResults = [];
-                    for (const lookback of lookbackPeriods) {
+                    const athBlock = historical.find(d => d.price === allTimeHigh)?.block || latestBlock;
+
+                    const normalizedHistorical = historical.map((d) => ({ x: d.block / athBlock, y: d.price / allTimeHigh }));
+
+                    const currentAngle = calculateNormalizedSegmentAngle(0, 0, latestBlock, latestPrice, athBlock, allTimeHigh);
+                    const angularRatio = currentAngle / 45.0;
+                    const { a: curvature } = calculateQuadraticFit(normalizedHistorical);
+
+                    const lookbacks = generateLookbacks(latestBlock, curvature, angularRatio, window.CONFIG.GEO_MODEL_CONFIG);
+
+                    // Using the improved, non-cascading logic from before
+                    const momentumDeltas = [];
+                    for (const lookback of lookbacks) {
                         const startBlock = latestBlock - lookback;
                         if (startBlock <= 0) continue;
-                        const startRow = historical.slice().reverse().find((d) => d.block <= startBlock) || historical[0];
-                        const microAngle = calculateNormalizedSegmentAngle(startRow.block, startRow.price, latestBlock, latestPrice, latestBlock, allTimeHigh);
-                        analysisResults.push({ lookback, deviation: microAngle - currentAngle, microAngle });
+                        
+                        const startRow = historical.slice().reverse().find(d => d.block <= startBlock) || historical[0];
+                        const microAngle = calculateNormalizedSegmentAngle(startRow.block, startRow.price, latestBlock, latestPrice, athBlock, allTimeHigh);
+                        
+                        const deviation = microAngle - currentAngle;
+                        
+                        momentumDeltas.push({ lookback, deviation });
                     }
-                    const allDiffs = analysisResults.map((r) => r.deviation);
-                    const stdDev = calculateStdDev(allDiffs);
-                    analysisResults.forEach((res) => { res.status = sigCatStdDev(res.deviation, stdDev); });
+
+                    const allDiffs = momentumDeltas.map((r) => r.deviation);
+                    const stdDevVal = calculateStdDev(allDiffs);
+                    momentumDeltas.forEach((res) => { res.status = sigCatStdDev(res.deviation, stdDevVal); });
+
+                    // ========= ADD latestBlock TO THE DATA OBJECT =========
                     const analysisData = {
-                        historical, normalizedHistorical, analysisResults, fit,
-                        latestBlock, allTimeHigh, currentAngle, macroActualSlope
+                        historical, normalizedHistorical, momentumDeltas, fit: calculateQuadraticFit(normalizedHistorical),
+                        athBlock, allTimeHigh, currentAngle, latestBlock // <-- Pass latestBlock here
                     };
-                    
+                    // ======================================================
+
                     const macroCanvas = document.getElementById("macroChart");
-                    if (!macroCanvas) throw new Error("Could not find canvas element with id 'macroChart'");
                     const microCanvas = document.getElementById("microChart");
-                    if (!microCanvas) throw new Error("Could not find canvas element with id 'microChart'");
+                    // ... (rest of the code is fine) ...
                     const container = macroCanvas.parentElement;
-                    if (!container) throw new Error("Could not find the parent container for the macro chart");
                     const canvasSize = container.getBoundingClientRect().width;
                     macroCanvas.width = macroCanvas.height = canvasSize;
                     microCanvas.width = microCanvas.height = canvasSize;
-                    
+
                     loader.style.display = "none";
                     macroCanvas.style.display = "block";
                     microCanvas.style.display = "block";
-                    
+
                     drawMacroChart(macroCanvas, analysisData);
                     drawMicroChart(microCanvas, analysisData);
+
                 } catch (err) {
                     loader.textContent = "Error loading chart: " + err.message;
                     console.error(err);
                 }
             };
-            
-            runAll();
 
+            runAll();
             let resizeTimer;
             window.addEventListener("resize", () => {
                 clearTimeout(resizeTimer);

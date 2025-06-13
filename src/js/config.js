@@ -13,32 +13,55 @@ export const CONFIG = {
 
     // --- Geometric Model Parameters ---
     GEO_MODEL_CONFIG: {
-        // pulls the model towards shorter horizons
+        // --- Lookback Window Behavior (Calibrated) ---
+        // NOTE: The logic has been updated. Strong momentum now uses LONGER lookbacks
+        // to see the context of a move, and slow momentum uses SHORTER lookbacks to
+        // focus on the recent slowdown.
+
+        // Behavior during strong/decisive momentum (Alpha ≈ 1).
+        // Produces LONGER lookbacks (~21 days to ~6 months).
+        // Counter-intuitively, smaller cycle values produce longer lookbacks.
         steepeningLookbackConfig: {
-            startCycles: 50,
-            endCycles: 200,
+            startCycles: 17,
+            endCycles: 34,
         },
-        // pulls the model towards longer horizons
+        // Behavior during slow/consolidating momentum (Alpha ≈ 0).
+        // Produces SHORTER lookbacks (~10 days to ~80 days).
+        // Larger cycle values produce shorter lookbacks.
         flatteningLookbackConfig: {
-            startCycles: 30,
-            endCycles: 150,
+            startCycles: 36,
+            endCycles: 231,
         },
-        // Controls the movement between steepening and flattening curves.
-        // Higher values make the model more sensitive to curvature changes.
-        curvatureSensitivity: 1,
-        // Number of final lookbacks to consider for curvature analysis.
-        numFinalLookbacks: 5,
-        // % of the total lookback range to consider for curvature analysis.
-        lookbackRangeDenominator: 0.25,
-        curvatureSensitivity: 1,
-        slopeSensitivity    : 1,
-        slopeWeight         : 0.25,  // 0-1 blend factor
+
+
+        // --- Macro Signal Blending & Sensitivity ---
+        // Weighting of Angular Ratio vs. Curvature.
+        // 0 = 100% Curvature, 1 = 100% Angular Ratio
+        angularRatioWeight: 0.6,
+
+        // Sensitivity multipliers for normalization
+        curvatureSensitivity: 1.0,
+        angularRatioSensitivity: 1.0,
+
+        // --- Normalization Statistics ---
+        // These values should ideally be calculated by analyzing the entire
+        // historical data set for each metric. You would run the metric calculation
+        // for every day in history, then find the mean and standard deviation
+        // of the results. These are sensible defaults.
         curvatureStats: { mean: 0.0003, std: 0.0015 },
-        slopeStats    : { mean: 0.00004, std: 0.0002 },
-        maxLookbackBlocks       : 210_000,
-        loopSafetyLimit         : 10_000,
-        // Weighting config
-        lookbackWeightExponent : 1.0,  // “p” above (try 0.5–2)
-        scoreScale             : 15,   // replaces UI.finalScoreScale
+        // For Angular Ratio (Current Angle / 45). A healthy trend is ~1.0.
+        angularRatioStats: { mean: 0.8, std: 0.5 },
+
+        // --- Lookback Generation Parameters ---
+        numFinalLookbacks: 5,
+        lookbackRangeDenominator: 0.25, // Uses up to 25% of history for lookbacks
+        maxLookbackBlocks: 210_000,     // Approx 4 years (one halving cycle)
+        loopSafetyLimit: 10_000,
+
+        // --- Final Score Weighting ---
+        // A negative exponent gives MORE weight to LONGER lookbacks. This makes the
+        // final score trust the established trend over short-term volatility.
+        lookbackWeightExponent: -1.0,
+        scoreScale: 15,               // Replaces UI_CONFIG.finalScoreScale
     },
-}; 
+};

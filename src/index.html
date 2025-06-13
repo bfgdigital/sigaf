@@ -7,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="css/styles.css">
     <script type="module">
+        // Make config and analysis modules globally available for debugging if needed
         import { CONFIG } from './js/config.js';
         import * as analysis from './js/analysis.js';
         window.CONFIG = CONFIG;
@@ -31,11 +32,10 @@
                             <span class="label">Current Trend Angle</span>
                             <span class="value" id="currentAngle">—<span class="tooltip-icon">?</span>
                                 <div class="tooltip">
-                                    This is our dynamic benchmark. It's the
-                                    angle of the line from Bitcoin's origin
+                                    The angle of the line from Bitcoin's origin
                                     to its current price, normalized within
-                                    a 1x1 box (Time vs Price/ATH). Recent
-                                    momentum is compared against this angle.
+                                    a 1x1 box (Time vs Price/ATH). This defines
+                                    the health of the macro trend.
                                 </div>
                             </span>
                         </td>
@@ -47,7 +47,7 @@
                                     perfect, straight line from origin to
                                     the All-Time High price on the
                                     normalized chart. It serves as a fixed
-                                    reference point.
+                                    reference point for the trend angle.
                                 </div>
                             </span>
                         </td>
@@ -74,7 +74,7 @@
 
             <div class="section">
                 <div class="section-title">
-                    Micro View - How is Bitcoin doing relative to its recent history?
+                    Micro View - How is Bitcoin's momentum changing across time horizons?
                 </div>
                 <div class="micro-grid" id="microGrid">
                     <div class="calculating-overlay">
@@ -93,12 +93,10 @@
 
         <div class="footer">
             <div class="footer-text">
-                Each horizon shows the velocity and direction of recent
-                price movement.<br />
-                If the consensus of signals is strongly negative, then you
-                should Care.
+                Each horizon shows momentum deviation relative to the overall macro trend.<br />
+                This measures true acceleration, corrected for geometric distortion.
             </div>
-            <a href="wtfit.html" class="footer-link">Read the full explanation →</a>
+            <a href="charts.html" class="footer-link">See the geometric charts →</a>
             <div class="error" id="errorStatus" style="display: none"></div>
         </div>
     </div>
@@ -107,13 +105,12 @@
         import {
             parseCsvLines,
             calculateQuadraticFit,
-            generateLookbacksAlongMacroActual,
+            generateLookbacks,
             calculateNormalizedSegmentAngle,
             calculateStdDev,
             sigCatStdDev
         } from './js/analysis.js';
 
-        // --- Live price fetching with fallback ---
         async function getLiveBitcoinPrice() {
             try {
                 const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
@@ -134,38 +131,27 @@
                 const bhResp = await fetch("https://blockstream.info/api/blocks/tip/height");
                 const blockHeight = bhResp.ok ? parseInt(await bhResp.text()) : 0;
 
-                const csvResp = await fetch(`${CONFIG.CSV_URL}?v=${Date.now()}`);
+                const csvResp = await fetch(`${window.CONFIG.CSV_URL}?v=${Date.now()}`);
                 if (!csvResp.ok) throw new Error(`Could not load CSV: ${csvResp.statusText}`);
 
-                const lines = csvResp.text().then(text =>
-                    text.split("\n").slice(1).filter(l => l.trim())
-                );
-                const [csvLines] = await Promise.all([lines]);
+                const lines = await csvResp.text().then(text => text.split("\n").slice(1).filter(l => l.trim()));
+                if (lines.length < 2) throw new Error("No valid price data in CSV.");
 
-                if (csvLines.length < 2) throw new Error("No valid price data in CSV.");
-
-                // Calibrate block-time conversion
-                const lastCells = csvLines[0].split(",");
+                const lastCells = lines[0].split(",");
                 const lastTimestamp = lastCells[0].includes("-") && lastCells[0].length === 10
                     ? new Date(lastCells[0] + "T00:00:00Z").getTime()
                     : new Date(Number(lastCells[0])).getTime();
 
                 if (isNaN(lastTimestamp)) throw new Error(`Could not parse last date: ${lastCells[0]}`);
 
-                const daysSinceGenesis = (Date.now() - CONFIG.GENESIS_DATE.getTime()) / 86_400_000;
+                const daysSinceGenesis = (Date.now() - window.CONFIG.GENESIS_DATE.getTime()) / 86_400_000;
                 const trueBlocksPerDay = blockHeight > 0 ? blockHeight / daysSinceGenesis : 144;
-
-                const lastDataBlockHeight =
-                    blockHeight - (Date.now() - lastTimestamp) * (trueBlocksPerDay / 86_400_000);
-
-                const calibratedBlockTimeMs =
-                    (lastTimestamp - CONFIG.GENESIS_DATE.getTime()) / lastDataBlockHeight;
+                const lastDataBlockHeight = blockHeight - (Date.now() - lastTimestamp) * (trueBlocksPerDay / 86_400_000);
+                const calibratedBlockTimeMs = (lastTimestamp - window.CONFIG.GENESIS_DATE.getTime()) / lastDataBlockHeight;
 
                 if (calibratedBlockTimeMs <= 0) throw new Error("Invalid block time calculation.");
 
-                const historical = parseCsvLines(csvLines, calibratedBlockTimeMs)
-                    .sort((a, b) => a.block - b.block);
-
+                const historical = parseCsvLines(lines, calibratedBlockTimeMs).sort((a, b) => a.block - b.block);
                 document.querySelector(".calculating-overlay").style.display = "none";
 
                 // ------------------------------------------------------------------
@@ -173,109 +159,89 @@
                 // ------------------------------------------------------------------
                 const macroEnd = historical[historical.length - 1];
                 const allTimeHigh = Math.max(...historical.map(d => d.price));
-
                 const livePrice = await getLiveBitcoinPrice();
                 const latestPrice = macroEnd.price;
                 const displayPrice = livePrice || latestPrice;
                 const latestBlock = macroEnd.block;
+                const athBlock = historical.find(d => d.price === allTimeHigh)?.block || latestBlock;
 
+                document.getElementById("blockInfo").textContent = `Live Block ${blockHeight.toLocaleString()} • Data to Block ${latestBlock.toLocaleString()}`;
                 document.getElementById("blockInfo").style.display = "";
-                document.getElementById("blockInfo").textContent =
-                    `Live Block ${blockHeight.toLocaleString()} • Data to Block ${latestBlock.toLocaleString()}`;
 
-                // Weekly movement
                 const weekAgoBlock = latestBlock - 7 * trueBlocksPerDay;
                 const weekAgoData = historical.slice().reverse().find(d => d.block <= weekAgoBlock);
                 if (weekAgoData) {
                     const pct = ((displayPrice - weekAgoData.price) / weekAgoData.price) * 100;
                     const up = pct >= 0;
-                    document.getElementById('weeklyMovement').innerHTML =
-                        `BTC is <span class="${up ? 'velocity-up' : 'velocity-down'}">${up ? 'up' : 'down'} ${Math.abs(pct).toFixed(1)}%</span> this week`;
+                    document.getElementById('weeklyMovement').innerHTML = `BTC is <span class="${up ? 'velocity-up' : 'velocity-down'}">${up ? 'up' : 'down'} ${Math.abs(pct).toFixed(1)}%</span> this week`;
                 }
 
-                // Angles & price display
-                const currentAngle = calculateNormalizedSegmentAngle(
-                    0, 0, latestBlock, displayPrice, latestBlock, allTimeHigh
-                );
-                document.getElementById("currentAngle").innerHTML =
-                    `${currentAngle.toFixed(2)}°<span class="tooltip-icon">?</span><div class="tooltip">This is our dynamic benchmark. It's the angle of the line from Bitcoin's origin to its current price, normalized within a 1x1 box (Time vs Price/ATH). Recent momentum is compared against this angle.</div>`;
-
-                document.getElementById("macroPrice").innerHTML =
-                    `$${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's price. Updated live if possible, otherwise from the latest data point.</div>`;
-                document.getElementById("athPrice").innerHTML =
-                    `$${allTimeHigh.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's highest recorded price. This defines the top of our geometric chart.</div>`;
+                const currentAngle = calculateNormalizedSegmentAngle(0, 0, latestBlock, displayPrice, athBlock, allTimeHigh);
+                document.getElementById("currentAngle").innerHTML = `${currentAngle.toFixed(2)}°<span class="tooltip-icon">?</span><div class="tooltip">The angle of the line from Bitcoin's origin to its current price, normalized within a 1x1 box (Time vs Price/ATH). This defines the health of the macro trend.</div>`;
+                document.getElementById("macroPrice").innerHTML = `$${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's price. Updated live if possible, otherwise from the latest data point.</div>`;
+                document.getElementById("athPrice").innerHTML = `$${allTimeHigh.toLocaleString()}<span class="tooltip-icon-subtle">?</span><div class="tooltip">Bitcoin's highest recorded price. This defines the top of our geometric chart.</div>`;
 
                 // ------------------------------------------------------------------
-                // Curvature & look-back generation
+                // Look-back generation and momentum analysis
                 // ------------------------------------------------------------------
-                const normData = historical.map(d => ({
-                    x: d.block / latestBlock,
-                    y: d.price / allTimeHigh,
-                }));
+                const normData = historical.map(d => ({ x: d.block / athBlock, y: d.price / allTimeHigh }));
                 const { a: curvature } = calculateQuadraticFit(normData);
-                const macroActualSlope = displayPrice / allTimeHigh;
+                const angularRatio = currentAngle / 45.0;
 
-                const lookbacks = generateLookbacksAlongMacroActual(
-                    latestBlock,
-                    curvature,
-                    CONFIG.GEO_MODEL_CONFIG,
-                    macroActualSlope
-                );
+                const lookbacks = generateLookbacks(latestBlock, curvature, angularRatio, window.CONFIG.GEO_MODEL_CONFIG);
 
-                // ------------------------------------------------------------------
-                // Micro-analysis cards
-                // ------------------------------------------------------------------
                 const microGrid = document.getElementById("microGrid");
                 microGrid.innerHTML = "";
-                const results = [];
 
+                // 1. Calculate the angle for each generated lookback period.
+                let angleResults = [];
                 for (const lookback of lookbacks) {
                     const startBlock = latestBlock - lookback;
                     if (startBlock <= 0) continue;
-
                     const startRow = historical.slice().reverse().find(d => d.block <= startBlock) || historical[0];
-
-                    const microAngle = calculateNormalizedSegmentAngle(
-                        startRow.block, startRow.price,
-                        latestBlock, displayPrice,
-                        latestBlock, allTimeHigh
-                    );
-
-                    results.push({
-                        lookback,
-                        deviation: microAngle - currentAngle,
-                        microAngle
-                    });
+                    const microAngle = calculateNormalizedSegmentAngle(startRow.block, startRow.price, latestBlock, displayPrice, athBlock, allTimeHigh);
+                    angleResults.push({ lookback, microAngle });
                 }
 
-                // Sort longest horizon first (leftmost column)
-                results.sort((a, b) => b.lookback - a.lookback);
+                if (angleResults.length < 2) {
+                    microGrid.innerHTML = "<div class='calculating-overlay'>Not enough data for momentum analysis.</div>";
+                    return;
+                }
+
+                // ====================================================================
+                // ========= CORRECTED AND SIMPLIFIED DEVIATION LOGIC =========
+                // ====================================================================
+                const momentumDeltas = [];
+
+                for (const result of angleResults) {
+                    // The deviation is the difference between this horizon's angle and the
+                    // overall macro trend angle (`currentAngle`). This is the most direct 
+                    // and stable measure of momentum change, avoiding cascading errors.
+                    const deviation = result.microAngle - currentAngle;
+                    momentumDeltas.push({
+                        lookback: result.lookback,
+                        deviation: deviation,
+                    });
+                }
+                // ====================================================================
 
                 // ------------------------------------------------------------------
                 // Weighted consensus score
                 // ------------------------------------------------------------------
-                const σ = calculateStdDev(results.map(r => r.deviation)) || 1;
-                const Lmax = Math.max(...results.map(r => r.lookback));
-                const p = CONFIG.GEO_MODEL_CONFIG.lookbackWeightExponent || 0;
-                const scale = CONFIG.GEO_MODEL_CONFIG.scoreScale || CONFIG.UI_CONFIG.finalScoreScale;
+                const σ = calculateStdDev(momentumDeltas.map(r => r.deviation)) || 1;
+                const Lmax = Math.max(...momentumDeltas.map(r => r.lookback));
+                const p = window.CONFIG.GEO_MODEL_CONFIG.lookbackWeightExponent;
+                const scale = window.CONFIG.GEO_MODEL_CONFIG.scoreScale;
 
                 let weightedSum = 0;
                 let weightTotal = 0;
 
-                for (const res of results) {
-                    // Determine category & class for UI
+                for (const res of momentumDeltas) {
                     const cat = sigCatStdDev(res.deviation, σ);
-                    const direction =
-                        cat.text === "party" ? 1 :
-                            cat.text === "peachy" ? 1 :
-                                cat.text === "no bueno" ? -1 :
-                                    cat.text === "watch" ? -1 :
-                                        0;
-
+                    const direction = cat.text === "party" || cat.text === "peachy" ? 1 : cat.text === "no bueno" || cat.text === "watch" ? -1 : 0;
                     const zMag = Math.abs(res.deviation / σ);
                     const lengthFac = Math.pow(Lmax / res.lookback, p);
                     const weight = zMag * lengthFac;
-
                     weightedSum += direction * weight;
                     weightTotal += weight;
 
@@ -284,7 +250,7 @@
                     card.innerHTML =
                         `<div class="horizon">${res.lookback.toLocaleString()} Block Lookback</div>` +
                         `<div class="signal ${cat.cls}">${cat.text}</div>` +
-                        `<div class="detail">${res.deviation >= 0 ? "↗" : "↘"} ${res.microAngle.toFixed(1)}°</div>`;
+                        `<div class="detail">${res.deviation >= 0 ? "↗" : "↘"} ${res.deviation.toFixed(1)}°</div>`;
                     microGrid.appendChild(card);
                 }
 
@@ -294,10 +260,10 @@
                 // Final verdict
                 // ------------------------------------------------------------------
                 const finalWordEl = document.getElementById("finalWord");
-                if (consensusScore < CONFIG.UI_CONFIG.negativeThreshold) {
+                if (consensusScore < window.CONFIG.UI_CONFIG.negativeThreshold) {
                     finalWordEl.textContent = "Yep..";
                     finalWordEl.className = "final-answer verdict-no";
-                } else if (consensusScore > CONFIG.UI_CONFIG.positiveThreshold) {
+                } else if (consensusScore > window.CONFIG.UI_CONFIG.positiveThreshold) {
                     finalWordEl.textContent = "No. Tick-tock, next block..";
                     finalWordEl.className = "final-answer verdict-yep";
                 } else {
