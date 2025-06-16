@@ -217,18 +217,25 @@ body {
     position: relative;
 }
 
+/* Micro-card styles */
+
+
 .micro-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 12px;
 }
 
 .micro-card {
-    background: #f8f9fa;
+    background: #ffffff;
     border-radius: 8px;
-    padding: 16px 12px;
+    padding: 12px;
     text-align: center;
     transition: all 0.2s ease;
+    border: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
 .micro-card:hover {
@@ -236,27 +243,74 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.micro-card .signal {
+    font-size: 1.1em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.micro-card .main-metric {
+    font-size: 1em;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.micro-card .main-metric .arrow {
+    font-size: 0.9em;
+}
+
 .micro-card .horizon {
     font-size: 0.75em;
     color: #6b7280;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
 }
 
-.micro-card .signal {
-    font-size: 1.4em;
-    font-weight: 700;
-    margin: 8px 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.micro-card .deltas {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.7em;
 }
 
-.micro-card .detail {
-    font-size: 0.8em;
-    color: #6b7280;
-    margin-top: 8px;
+.micro-card .delta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 6px;
 }
+
+.micro-card .delta-label {
+    color: #6b7280;
+    min-width: 50px;
+    text-align: left;
+    font-weight: 500;
+}
+
+.micro-card .delta-value {
+    font-weight: 600;
+    font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+    font-size: 0.85em;
+}
+
+.micro-card .delta-value.positive {
+    color: #059669;
+}
+
+.micro-card .delta-value.negative {
+    color: #dc2626;
+}
+
+
+
+/* Signal styles */
 
 .sig-meh {
     color: #6b7280;
@@ -552,7 +606,27 @@ pre code {
     }
 
     .micro-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+
+    .micro-card .signal {
+        font-size: 0.95em;
+    }
+
+    .micro-card .main-metric {
+        font-size: 0.9em;
+    }
+
+    .micro-card .horizon {
+        font-size: 0.7em;
+    }
+
+    .micro-card .deltas {
+        font-size: 0.65em;
+    }
+
+    .micro-card .delta-label {
+        min-width: 45px;
     }
 }
 
